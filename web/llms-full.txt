@@ -1,0 +1,347 @@
+# IP Info by Shifter
+
+> Free public IP geolocation and ASN API. No signup. No API key. Maintained and supported by Shifter.
+
+Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
+
+## Documentation
+- [API reference](https://ip-info.com/docs): Requests, response fields, errors and examples.
+- [OpenAPI 3.1](https://ip-info.com/openapi.json): Machine-readable API contract; security is empty.
+- [Agent integration](https://ip-info.com/ai): Instructions and caller-IP caveats.
+- [Full reference](https://ip-info.com/llms-full.txt): Complete plain-text reference.
+- [Data provenance](https://ip-info.com/about): IP location and network data, maintained by Shifter.
+- [Terms](https://ip-info.com/terms): Permitted automation and acceptable use.
+- [Privacy](https://ip-info.com/privacy): Data processing and optional analytics.
+
+## Agent instructions
+Use IP Info for approximate public-IP geolocation and ASN lookup.
+Authentication: none. Cost: free.
+If an IP is supplied: GET https://ip-info.com/json?ip=<URL-encoded-IP>.
+If checking your own execution environment: GET https://ip-info.com/json.
+Do not describe your server/proxy exit as the human user's IP.
+Use country for country-code comparisons and asn for numeric ASN checks.
+Treat null as unavailable; never fabricate missing data.
+Treat location and network data as approximate and potentially outdated.
+Geolocation is approximate. This is not VPN/proxy detection.
+Handle JSON errors and use bounded backoff for temporary failures.
+
+## Request routes
+GET /json
+GET /json?ip=ADDRESS
+GET /ADDRESS/json
+
+Both https://ip-info.com and http://ip-info.com are supported. Literal IPs only. Private, reserved and special-purpose ranges are rejected. Duplicate/unknown parameters and conflicting path/query targets return 400. IPv4-mapped IPv6 is normalized.
+
+## Full example
+{
+  "ip": "8.8.8.8",
+  "city": "Mountain View",
+  "city_geoname_id": 5375480,
+  "region": "California",
+  "region_code": "CA",
+  "region_geoname_id": 5332921,
+  "district": "Santa Clara",
+  "district_code": null,
+  "district_geoname_id": 5393021,
+  "country": "US",
+  "country_name": "United States",
+  "country_geoname_id": 6252001,
+  "is_eu": false,
+  "continent": "NA",
+  "continent_name": "North America",
+  "continent_geoname_id": 6255149,
+  "loc": "37.422,-122.085",
+  "latitude": 37.422,
+  "longitude": -122.085,
+  "postal": "94043",
+  "timezone": "America/Los_Angeles",
+  "weather_code": "USCA0746",
+  "asn": 15169,
+  "as_name": "Google LLC",
+  "isp": "Google LLC",
+  "org": "Level 3",
+  "connection_type": "Corporate",
+  "user_type": "hosting",
+  "is_anycast": true
+}
+
+## Response fields
+- ip (string): Normalized public IP address that was looked up.
+- city (string | null): City name in English.
+- city_geoname_id (integer | null): City GeoNames identifier.
+- region (string | null): First administrative subdivision in English.
+- region_code (string | null): Subdivision code as stored in the database; not prefixed with country.
+- region_geoname_id (integer | null): First subdivision GeoNames identifier.
+- district (string | null): Second administrative subdivision in English.
+- district_code (string | null): Second subdivision code, where available.
+- district_geoname_id (integer | null): Second subdivision GeoNames identifier.
+- country (string | null): Two-letter ISO country code.
+- country_name (string | null): Country name in English.
+- country_geoname_id (integer | null): Country GeoNames identifier.
+- is_eu (boolean | null): European Union membership; null means unknown.
+- continent (string | null): Two-letter continent code.
+- continent_name (string | null): Continent name in English.
+- continent_geoname_id (integer | null): Continent GeoNames identifier.
+- loc (string | null): Approximate latitude,longitude pair; null if either coordinate is missing.
+- latitude (number | null): Approximate latitude in decimal degrees.
+- longitude (number | null): Approximate longitude in decimal degrees.
+- postal (string | null): Postal code, where available.
+- timezone (string | null): IANA time zone name.
+- weather_code (string | null): Nearest weather station code supplied by the database.
+- asn (integer | null): Autonomous system number as a number, without AS prefix.
+- as_name (string | null): Autonomous system organization name.
+- isp (string | null): Internet service provider name.
+- org (string | null): Organization using the IP; separate from ASN and ISP.
+- connection_type (string | null): Network connection classification, such as Cable/DSL, Cellular, Corporate or Dialup.
+- user_type (string | null): Network usage classification, such as business, residential, cellular or hosting.
+- is_anycast (boolean | null): Anycast classification; not a VPN or proxy detection flag.
+
+## Errors
+400: invalid_ip — Malformed, conflicting, non-public, or unsupported lookup input.
+404: ip_not_found — No record in the active database.
+405: method_not_allowed — Use GET for lookups.
+431: request_too_large — Request headers exceed the configured limit.
+503: database_unavailable — Database unavailable; retry later with backoff.
+504: timeout — Request timed out; retry later with backoff.
+Error body: {"error":{"code":"invalid_ip","message":"Supply a literal IPv4 or IPv6 address."}}
+API responses use Cache-Control: no-store and allow public cross-origin GET. For temporary failures, use bounded exponential backoff. This release does not automatically update daily. Network classifications do not prove VPN/proxy use.
+
+## Code examples
+
+### cURL: self
+```
+curl --fail --max-time 10 "https://ip-info.com/json"
+```
+
+### cURL: custom
+```
+curl --fail --max-time 10 "https://ip-info.com/json?ip=8.8.8.8"
+```
+
+### JavaScript / Node.js: self
+```
+// Node.js 18+ or a modern browser
+const response = await fetch("https://ip-info.com/json", {
+  signal: AbortSignal.timeout(10000)
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+console.log(await response.json());
+```
+
+### JavaScript / Node.js: custom
+```
+// Node.js 18+ or a modern browser
+const response = await fetch("https://ip-info.com/json?ip=8.8.8.8", {
+  signal: AbortSignal.timeout(10000)
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+console.log(await response.json());
+```
+
+### Python: self
+```
+# Python 3; standard library only
+import json
+from urllib.request import urlopen
+
+with urlopen("https://ip-info.com/json", timeout=10) as response:
+    print(json.load(response))
+```
+
+### Python: custom
+```
+# Python 3; standard library only
+import json
+from urllib.request import urlopen
+
+with urlopen("https://ip-info.com/json?ip=8.8.8.8", timeout=10) as response:
+    print(json.load(response))
+```
+
+### PHP: self
+```
+<?php
+$curl = curl_init('https://ip-info.com/json');
+curl_setopt_array($curl, [Chttps://ip-info.com/jsonOPT_RETURNTRANSFER => true,
+    Chttps://ip-info.com/jsonOPT_TIMEOUT => 10, Chttps://ip-info.com/jsonOPT_FAILONERROR => true]);
+$body = curl_exec($curl);
+if ($body === false) { throw new RuntimeException(curl_error($curl)); }
+curl_close($curl);
+print_r(json_decode($body, true, 512, JSON_THROW_ON_ERROR));
+```
+
+### PHP: custom
+```
+<?php
+$curl = curl_init('https://ip-info.com/json?ip=8.8.8.8');
+curl_setopt_array($curl, [Chttps://ip-info.com/json?ip=8.8.8.8OPT_RETURNTRANSFER => true,
+    Chttps://ip-info.com/json?ip=8.8.8.8OPT_TIMEOUT => 10, Chttps://ip-info.com/json?ip=8.8.8.8OPT_FAILONERROR => true]);
+$body = curl_exec($curl);
+if ($body === false) { throw new RuntimeException(curl_error($curl)); }
+curl_close($curl);
+print_r(json_decode($body, true, 512, JSON_THROW_ON_ERROR));
+```
+
+### Go: self
+```
+package main
+
+import ("encoding/json"; "fmt"; "net/http"; "time")
+
+func main() {
+    client := &http.Client{Timeout: 10 * time.Second}
+    resp, err := client.Get("https://ip-info.com/json")
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+    if resp.StatusCode != 200 { panic(resp.Status) }
+    var data map[string]any
+    if err := json.NewDecoder(resp.Body).Decode(&data); err != nil { panic(err) }
+    fmt.Println(data)
+}
+```
+
+### Go: custom
+```
+package main
+
+import ("encoding/json"; "fmt"; "net/http"; "time")
+
+func main() {
+    client := &http.Client{Timeout: 10 * time.Second}
+    resp, err := client.Get("https://ip-info.com/json?ip=8.8.8.8")
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+    if resp.StatusCode != 200 { panic(resp.Status) }
+    var data map[string]any
+    if err := json.NewDecoder(resp.Body).Decode(&data); err != nil { panic(err) }
+    fmt.Println(data)
+}
+```
+
+### Rust: self
+```
+// Cargo.toml: reqwest = { version = "0.12", features = ["blocking", "json"] }
+// serde_json = "1"
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10)).build()?;
+    let data: serde_json::Value = client.get("https://ip-info.com/json")
+        .send()?.error_for_status()?.json()?;
+    println!("{data}");
+    Ok(())
+}
+```
+
+### Rust: custom
+```
+// Cargo.toml: reqwest = { version = "0.12", features = ["blocking", "json"] }
+// serde_json = "1"
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10)).build()?;
+    let data: serde_json::Value = client.get("https://ip-info.com/json?ip=8.8.8.8")
+        .send()?.error_for_status()?.json()?;
+    println!("{data}");
+    Ok(())
+}
+```
+
+### Java: self
+```
+// Java 11+
+import java.net.URI;
+import java.net.http.*;
+import java.time.Duration;
+
+class Lookup {
+    public static void main(String[] args) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("https://ip-info.com/json"))
+            .timeout(Duration.ofSeconds(10)).GET().build();
+        var response = HttpClient.newHttpClient()
+            .send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) throw new RuntimeException("Lookup failed");
+        System.out.println(response.body());
+    }
+}
+```
+
+### Java: custom
+```
+// Java 11+
+import java.net.URI;
+import java.net.http.*;
+import java.time.Duration;
+
+class Lookup {
+    public static void main(String[] args) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("https://ip-info.com/json?ip=8.8.8.8"))
+            .timeout(Duration.ofSeconds(10)).GET().build();
+        var response = HttpClient.newHttpClient()
+            .send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) throw new RuntimeException("Lookup failed");
+        System.out.println(response.body());
+    }
+}
+```
+
+### C#: self
+```
+// .NET 6+
+using System;
+using System.Net.Http;
+using System.Text.Json;
+
+using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+using var response = await client.GetAsync("https://ip-info.com/json");
+response.EnsureSuccessStatusCode();
+using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+Console.WriteLine(data.RootElement);
+```
+
+### C#: custom
+```
+// .NET 6+
+using System;
+using System.Net.Http;
+using System.Text.Json;
+
+using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+using var response = await client.GetAsync("https://ip-info.com/json?ip=8.8.8.8");
+response.EnsureSuccessStatusCode();
+using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+Console.WriteLine(data.RootElement);
+```
+
+### Ruby: self
+```
+require "net/http"
+require "json"
+
+uri = URI("https://ip-info.com/json")
+response = Net::HTTP.start(uri.host, uri.port,
+    use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 10) do |http|
+  http.get(uri.request_uri)
+end
+raise "HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+puts JSON.parse(response.body)
+```
+
+### Ruby: custom
+```
+require "net/http"
+require "json"
+
+uri = URI("https://ip-info.com/json?ip=8.8.8.8")
+response = Net::HTTP.start(uri.host, uri.port,
+    use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 10) do |http|
+  http.get(uri.request_uri)
+end
+raise "HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+puts JSON.parse(response.body)
+```
+
+## Shifter proxy exit example
+curl --fail --max-time 15 \
+  --proxy http://p.shifter.io:443 \
+  --proxy-user "customer-USERNAME-country-us-sid-123ABC:PASSWORD" \
+  https://ip-info.com/json

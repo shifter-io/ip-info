@@ -1,0 +1,22 @@
+/target/
+/data/*.mmdb
+/data/*.mmdb.*
+/.env
+/node_modules/
+/artifacts/*
+!/artifacts/.gitkeep
+.DS_Store
+
+
+/test-results/
+/playwright-report/
+__pycache__/
+
+# Local configuration and licensed database copies
+.env.*
+!.env.example
+*.mmdb
+*.mmdb.*
+
+# Local Bunny account credentials
+/bunny.txt

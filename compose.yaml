@@ -1,0 +1,16 @@
+services:
+  ip-info:
+    build: .
+    image: ip-info:local
+    ports:
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 15s
+    environment:
+      SITE_INDEXABLE: "false"
+      GA4_MEASUREMENT_ID: "${GA4_MEASUREMENT_ID:-}"
+      TRUSTED_PROXY_CIDRS: "${TRUSTED_PROXY_CIDRS:-}"
+      CLIENT_IP_HEADER: "${CLIENT_IP_HEADER:-x-forwarded-for}"
+

@@ -1,0 +1,10 @@
+.git
+target
+node_modules
+artifacts
+.env
+.DS_Store
+
+
+.env.*
+bunny.txt

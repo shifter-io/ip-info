@@ -1,0 +1,722 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "IP Info by Shifter",
+    "version": "1.0.0",
+    "description": "Free public IP geolocation and ASN API. Maintained and supported by Shifter. No signup or API key.",
+    "termsOfService": "https://ip-info.com/terms",
+    "contact": {
+      "name": "Shifter",
+      "url": "https://shifter.io",
+      "email": "hi@shifter.io"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://ip-info.com"
+    },
+    {
+      "url": "http://ip-info.com"
+    }
+  ],
+  "security": [],
+  "paths": {
+    "/json": {
+      "get": {
+        "operationId": "lookupIp",
+        "summary": "Look up the caller or a supplied IP",
+        "description": "Free, no API key. Caller detection returns the requesting machine or proxy exit, not necessarily the human user's IP.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Public IPv4 or IPv6 literal. Omit to detect caller. Must match path IP when both are supplied.",
+            "example": "8.8.8.8"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IP lookup result; missing attributes are null.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "no-store"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpInfo"
+                },
+                "example": {
+                  "ip": "8.8.8.8",
+                  "city": "Mountain View",
+                  "city_geoname_id": 5375480,
+                  "region": "California",
+                  "region_code": "CA",
+                  "region_geoname_id": 5332921,
+                  "district": "Santa Clara",
+                  "district_code": null,
+                  "district_geoname_id": 5393021,
+                  "country": "US",
+                  "country_name": "United States",
+                  "country_geoname_id": 6252001,
+                  "is_eu": false,
+                  "continent": "NA",
+                  "continent_name": "North America",
+                  "continent_geoname_id": 6255149,
+                  "loc": "37.422,-122.085",
+                  "latitude": 37.422,
+                  "longitude": -122.085,
+                  "postal": "94043",
+                  "timezone": "America/Los_Angeles",
+                  "weather_code": "USCA0746",
+                  "asn": 15169,
+                  "as_name": "Google LLC",
+                  "isp": "Google LLC",
+                  "org": "Level 3",
+                  "connection_type": "Corporate",
+                  "user_type": "hosting",
+                  "is_anycast": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed, conflicting, non-public, or unsupported lookup input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "invalid_ip",
+                    "message": "Malformed, conflicting, non-public, or unsupported lookup input."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No record in the active database.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "ip_not_found",
+                    "message": "No record in the active database."
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Use GET for lookups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "method_not_allowed",
+                    "message": "Use GET for lookups."
+                  }
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Request headers exceed the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "request_too_large",
+                    "message": "Request headers exceed the configured limit."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "database_unavailable",
+                    "message": "Database unavailable; retry later with backoff."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Request timed out; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "timeout",
+                    "message": "Request timed out; retry later with backoff."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{ip}/json": {
+      "get": {
+        "operationId": "lookupIpByPath",
+        "summary": "Look up a supplied IP",
+        "description": "Free, no API key. Caller detection returns the requesting machine or proxy exit, not necessarily the human user's IP.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "ip",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Public IPv4 or IPv6 literal.",
+            "example": "8.8.8.8"
+          },
+          {
+            "name": "ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Public IPv4 or IPv6 literal. Omit to detect caller. Must match path IP when both are supplied.",
+            "example": "8.8.8.8"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IP lookup result; missing attributes are null.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "no-store"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpInfo"
+                },
+                "example": {
+                  "ip": "8.8.8.8",
+                  "city": "Mountain View",
+                  "city_geoname_id": 5375480,
+                  "region": "California",
+                  "region_code": "CA",
+                  "region_geoname_id": 5332921,
+                  "district": "Santa Clara",
+                  "district_code": null,
+                  "district_geoname_id": 5393021,
+                  "country": "US",
+                  "country_name": "United States",
+                  "country_geoname_id": 6252001,
+                  "is_eu": false,
+                  "continent": "NA",
+                  "continent_name": "North America",
+                  "continent_geoname_id": 6255149,
+                  "loc": "37.422,-122.085",
+                  "latitude": 37.422,
+                  "longitude": -122.085,
+                  "postal": "94043",
+                  "timezone": "America/Los_Angeles",
+                  "weather_code": "USCA0746",
+                  "asn": 15169,
+                  "as_name": "Google LLC",
+                  "isp": "Google LLC",
+                  "org": "Level 3",
+                  "connection_type": "Corporate",
+                  "user_type": "hosting",
+                  "is_anycast": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed, conflicting, non-public, or unsupported lookup input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "invalid_ip",
+                    "message": "Malformed, conflicting, non-public, or unsupported lookup input."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No record in the active database.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "ip_not_found",
+                    "message": "No record in the active database."
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Use GET for lookups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "method_not_allowed",
+                    "message": "Use GET for lookups."
+                  }
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Request headers exceed the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "request_too_large",
+                    "message": "Request headers exceed the configured limit."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "database_unavailable",
+                    "message": "Database unavailable; retry later with backoff."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Request timed out; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "timeout",
+                    "message": "Request timed out; retry later with backoff."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "IpInfo": {
+        "type": "object",
+        "required": [
+          "ip",
+          "city",
+          "city_geoname_id",
+          "region",
+          "region_code",
+          "region_geoname_id",
+          "district",
+          "district_code",
+          "district_geoname_id",
+          "country",
+          "country_name",
+          "country_geoname_id",
+          "is_eu",
+          "continent",
+          "continent_name",
+          "continent_geoname_id",
+          "loc",
+          "latitude",
+          "longitude",
+          "postal",
+          "timezone",
+          "weather_code",
+          "asn",
+          "as_name",
+          "isp",
+          "org",
+          "connection_type",
+          "user_type",
+          "is_anycast"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ip": {
+            "type": "string",
+            "description": "Normalized public IP address that was looked up.",
+            "examples": [
+              "8.8.8.8"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "City name in English.",
+            "examples": [
+              "Mountain View"
+            ]
+          },
+          "city_geoname_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "City GeoNames identifier.",
+            "examples": [
+              5375480
+            ]
+          },
+          "region": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "First administrative subdivision in English.",
+            "examples": [
+              "California"
+            ]
+          },
+          "region_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Subdivision code as stored in the database; not prefixed with country.",
+            "examples": [
+              "CA"
+            ]
+          },
+          "region_geoname_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "First subdivision GeoNames identifier.",
+            "examples": [
+              5332921
+            ]
+          },
+          "district": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Second administrative subdivision in English.",
+            "examples": [
+              "Santa Clara"
+            ]
+          },
+          "district_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Second subdivision code, where available.",
+            "examples": [
+              null
+            ]
+          },
+          "district_geoname_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Second subdivision GeoNames identifier.",
+            "examples": [
+              5393021
+            ]
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Two-letter ISO country code.",
+            "examples": [
+              "US"
+            ]
+          },
+          "country_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Country name in English.",
+            "examples": [
+              "United States"
+            ]
+          },
+          "country_geoname_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Country GeoNames identifier.",
+            "examples": [
+              6252001
+            ]
+          },
+          "is_eu": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "European Union membership; null means unknown.",
+            "examples": [
+              false
+            ]
+          },
+          "continent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Two-letter continent code.",
+            "examples": [
+              "NA"
+            ]
+          },
+          "continent_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Continent name in English.",
+            "examples": [
+              "North America"
+            ]
+          },
+          "continent_geoname_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Continent GeoNames identifier.",
+            "examples": [
+              6255149
+            ]
+          },
+          "loc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Approximate latitude,longitude pair; null if either coordinate is missing.",
+            "examples": [
+              "37.422,-122.085"
+            ]
+          },
+          "latitude": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Approximate latitude in decimal degrees.",
+            "examples": [
+              37.422
+            ]
+          },
+          "longitude": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Approximate longitude in decimal degrees.",
+            "examples": [
+              -122.085
+            ]
+          },
+          "postal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Postal code, where available.",
+            "examples": [
+              "94043"
+            ]
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "IANA time zone name.",
+            "examples": [
+              "America/Los_Angeles"
+            ]
+          },
+          "weather_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nearest weather station code supplied by the database.",
+            "examples": [
+              "USCA0746"
+            ]
+          },
+          "asn": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Autonomous system number as a number, without AS prefix.",
+            "examples": [
+              15169
+            ]
+          },
+          "as_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Autonomous system organization name.",
+            "examples": [
+              "Google LLC"
+            ]
+          },
+          "isp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Internet service provider name.",
+            "examples": [
+              "Google LLC"
+            ]
+          },
+          "org": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Organization using the IP; separate from ASN and ISP.",
+            "examples": [
+              "Level 3"
+            ]
+          },
+          "connection_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Network connection classification, such as Cable/DSL, Cellular, Corporate or Dialup.",
+            "examples": [
+              "Corporate"
+            ]
+          },
+          "user_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Network usage classification, such as business, residential, cellular or hosting.",
+            "examples": [
+              "hosting"
+            ]
+          },
+          "is_anycast": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Anycast classification; not a VPN or proxy detection flag.",
+            "examples": [
+              true
+            ]
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "ip-info-browser-checks",
+  "private": true,
+  "license": "MIT",
+  "scripts": { "test:browser": "playwright test", "generate": "python3 scripts/generate_site.py" },
+  "devDependencies": { "@playwright/test": "1.58.2" }
+}

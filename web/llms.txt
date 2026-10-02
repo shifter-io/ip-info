@@ -1,0 +1,14 @@
+# IP Info by Shifter
+
+> Free public IP geolocation and ASN API. No signup. No API key. Maintained and supported by Shifter.
+
+Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
+
+## Documentation
+- [API reference](https://ip-info.com/docs): Requests, response fields, errors and examples.
+- [OpenAPI 3.1](https://ip-info.com/openapi.json): Machine-readable API contract; security is empty.
+- [Agent integration](https://ip-info.com/ai): Instructions and caller-IP caveats.
+- [Full reference](https://ip-info.com/llms-full.txt): Complete plain-text reference.
+- [Data provenance](https://ip-info.com/about): IP location and network data, maintained by Shifter.
+- [Terms](https://ip-info.com/terms): Permitted automation and acceptable use.
+- [Privacy](https://ip-info.com/privacy): Data processing and optional analytics.
