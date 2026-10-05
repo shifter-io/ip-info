@@ -50,4 +50,19 @@ def openapi():
         for status,(code, desc) in ERRORS.items():
             responses[status] = {"description":desc,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"},"example":{"error":{"code":code,"message":desc}}}}}
         return {"operationId":op,"summary":"Look up a supplied IP" if path else "Look up the caller or a supplied IP", "description":"Free, no API key. Caller detection returns the requesting machine or proxy exit, not necessarily the human user's IP.","security":[],"parameters":params,"responses":responses}
-    return {"openapi":"3.1.0","info":{"title":"IP Info by Shifter","version":"1.0.0","description":"Free public IP geolocation and ASN API. Maintained and supported by Shifter. No signup or API key.","termsOfService":"https://ip-info.com/terms","contact":{"name":"Shifter","url":"https://shifter.io","email":"hi@shifter.io"}},"servers":[{"url":"https://ip-info.com"},{"url":"http://ip-info.com"}],"security":[],"paths":{"/json":{"get":operation("lookupIp")},"/{ip}/json":{"get":operation("lookupIpByPath",True)}},"components":{"schemas":{"IpInfo":{"type":"object","required":list(props),"additionalProperties":False,"properties":props},"Error":{"type":"object","required":["error"],"additionalProperties":False,"properties":{"error":{"type":"object","required":["code","message"],"additionalProperties":False,"properties":{"code":{"type":"string"},"message":{"type":"string"}}}}}}}}
+    myip = {
+        "operationId": "getMyIp",
+        "summary": "Return only the caller IP as plain text",
+        "description": "Returns the normalized IPv4 or IPv6 address followed by a newline. Uses the same trusted-proxy and authenticated-ingress rules as /json. Query parameters are ignored. No database is required; local/private caller addresses are returned too. Errors use the standard JSON envelope.",
+        "security": [],
+        "responses": {
+            "200": {
+                "description": "Caller IP address followed by a newline; no JSON wrapper.",
+                "headers": {"Cache-Control": {"schema": {"type": "string"}, "example": "no-store"}},
+                "content": {"text/plain": {"schema": {"type": "string"}, "example": "8.8.8.8\n"}},
+            },
+            **{status: response for status, response in operation("lookupIp")["responses"].items() if status in ("400", "405", "431", "504")},
+        },
+    }
+    myip["responses"]["400"]["description"] = "Unable to determine the caller IP, or invalid/missing trusted-ingress headers."
+    return {"openapi":"3.1.0","info":{"title":"IP Info by Shifter","version":"1.0.0","description":"Free public IP geolocation and ASN API. Maintained and supported by Shifter. No signup or API key.","termsOfService":"https://ip-info.com/terms","contact":{"name":"Shifter","url":"https://shifter.io","email":"hi@shifter.io"}},"servers":[{"url":"https://ip-info.com"},{"url":"http://ip-info.com"}],"security":[],"paths":{"/myip":{"get":myip},"/json":{"get":operation("lookupIp")},"/{ip}/json":{"get":operation("lookupIpByPath",True)}},"components":{"schemas":{"IpInfo":{"type":"object","required":list(props),"additionalProperties":False,"properties":props},"Error":{"type":"object","required":["error"],"additionalProperties":False,"properties":{"error":{"type":"object","required":["code","message"],"additionalProperties":False,"properties":{"code":{"type":"string"},"message":{"type":"string"}}}}}}}}

@@ -101,12 +101,13 @@ def main():
     error_list='<dl class="field-list">'+''.join(f'<div><dt>{status} · {code_}</dt><dd>{desc}</dd></div>' for status,(code_,desc) in ERRORS.items())+'</dl>'
     proxy='curl --fail --max-time 15 \\\n  --proxy http://p.shifter.io:443 \\\n  --proxy-user "customer-USERNAME-country-us-sid-123ABC:PASSWORD" \\\n  https://ip-info.com/json'
     request_examples=code('curl --fail "https://ip-info.com/json"\ncurl --fail "https://ip-info.com/json?ip=8.8.8.8"\ncurl --fail "https://ip-info.com/8.8.8.8/json"\ncurl --fail "https://ip-info.com/json?ip=2001:4860:4860::8888"')
-    content['/docs']=article('Developer documentation','One endpoint. No credentials.','Everything you need to add IP intelligence to your application.',f'''<nav class="toc" aria-label="On this page"><a href="#requests">Requests</a><a href="#response">Response</a><a href="#fields">Fields</a><a href="#examples">Examples</a><a href="#errors">Errors</a><a href="#proxies">Proxies</a></nav>
+    content['/docs']=article('Developer documentation','Your IP. No credentials.','Everything you need to add IP intelligence to your application.',f'''<nav class="toc" aria-label="On this page"><a href="#requests">Requests</a><a href="#myip">Plain-text IP</a><a href="#response">Response</a><a href="#fields">Fields</a><a href="#examples">Examples</a><a href="#errors">Errors</a><a href="#proxies">Proxies</a></nav>
 <div class="callout">Free public access. No signup, API key or application quota. Respect the <a href="/terms">acceptable-use terms</a>; availability depends on service capacity.</div>
 <h2 id="requests">Make a request</h2><p>Use <code>GET /json</code> to detect the caller, <code>GET /json?ip=ADDRESS</code> for a supplied address, or <code>GET /ADDRESS/json</code> for the path form. Both IPv4 and IPv6 literals are supported. URL-encode query values.</p>{request_examples}
 <p>Replace <code>https://</code> with <code>http://</code> for HTTP access. HTTP is not redirected; HTTPS encrypts the connection. Reused HTTPS connections can avoid a fresh handshake.</p>
-<p>Only public unicast addresses are accepted. Private, loopback, multicast, documentation and other special-purpose ranges are rejected. IPv4-mapped IPv6 addresses are normalized to IPv4. Hostnames, duplicate parameters, unknown parameters and conflicting path/query IPs are rejected. Matching path/query values are accepted.</p>
-<h2 id="response">The full response</h2><p>This example illustrates the response format. Live values may differ. Every listed field is present; unavailable values are <code>null</code>.</p>{sample}<button data-copy="full-response">Copy response</button>
+<p>JSON lookups accept only public unicast addresses. Private, loopback, multicast, documentation and other special-purpose ranges are rejected. IPv4-mapped IPv6 addresses are normalized to IPv4. Hostnames, duplicate parameters, unknown parameters and conflicting path/query IPs are rejected. Matching path/query values are accepted.</p>
+<h2 id="myip">Get only your IP address</h2><p>Use <code>GET /myip</code> for just the visitor’s IPv4 or IPv6 address, followed by a newline, with <code>Content-Type: text/plain; charset=utf-8</code>. No JSON wrapper or geolocation fields are included.</p>{code('curl --fail https://ip-info.com/myip')}{code('8.8.8.8')}<p>The example address is illustrative. This endpoint uses the same trusted-proxy and authenticated-ingress rules as <code>/json</code> and reports the requesting device or proxy’s network exit. Query parameters are ignored and cannot override the caller address. It works without the geolocation database and also returns local/private caller addresses when run locally. IPv4-mapped IPv6 addresses are normalized to IPv4.</p><p>Responses use <code>Cache-Control: no-store</code> and support public cross-origin GET. If the caller cannot be determined or trusted-ingress headers are invalid, the response is HTTP 400 with the standard JSON error body. HEAD returns the same headers with no body.</p>
+<h2 id="response">The full JSON response</h2><p>This example illustrates the response format. Live values may differ. Every listed field is present; unavailable values are <code>null</code>.</p>{sample}<button data-copy="full-response">Copy response</button>
 <h2 id="fields">Field reference</h2>{field_reference()}
 <h2 id="examples">Use your language</h2>{examples_widget()}<p>Complete examples remain available below without JavaScript. The interactive selector also offers HTTP variants.</p>{snippets}
 <h2 id="proxies">Verify a Shifter proxy exit</h2><p>Send the caller-detection request through your proxy to see its exit IP and database location. Replace the username and password with your own Shifter credentials; do not put credentials into the IP Info URL.</p>{code(proxy)}<p>Compare <code>country</code> with your requested country code. Different services may report different city or country values.</p>
@@ -117,6 +118,7 @@ def main():
 Authentication: none. Cost: free.
 If an IP is supplied: GET https://ip-info.com/json?ip=<URL-encoded-IP>.
 If checking your own execution environment: GET https://ip-info.com/json.
+For only your caller IP as plain text: GET https://ip-info.com/myip (address plus newline; no JSON).
 Do not describe your server/proxy exit as the human user's IP.
 Use country for country-code comparisons and asn for numeric ASN checks.
 Treat null as unavailable; never fabricate missing data.
@@ -135,7 +137,7 @@ Handle JSON errors and use bounded backoff for temporary failures.'''
 
 > Free public IP geolocation and ASN API. No signup. No API key. Maintained and supported by Shifter.
 
-Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
+Use GET https://ip-info.com/myip for only the caller's IP as plain text (address plus newline). Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
 
 ## Documentation
 - [API reference](https://ip-info.com/docs): Requests, response fields, errors and examples.
@@ -147,7 +149,7 @@ Use GET https://ip-info.com/json for the caller's network exit or GET https://ip
 - [Privacy](https://ip-info.com/privacy): Data processing and optional analytics.
 '''
     (WEB/'llms.txt').write_text(brief)
-    full=brief+'\n## Agent instructions\n'+instructions+'\n\n## Request routes\nGET /json\nGET /json?ip=ADDRESS\nGET /ADDRESS/json\n\nBoth https://ip-info.com and http://ip-info.com are supported. Literal IPs only. Private, reserved and special-purpose ranges are rejected. Duplicate/unknown parameters and conflicting path/query targets return 400. IPv4-mapped IPv6 is normalized.\n\n## Full example\n'+json.dumps(EXAMPLE,indent=2)+'\n\n## Response fields\n'
+    full=brief+'\n## Agent instructions\n'+instructions+'\n\n## Request routes\nGET /myip (plain-text caller IP plus newline; ignores query parameters; no database required; local/private caller IPs allowed; standard JSON errors)\nGET /json\nGET /json?ip=ADDRESS\nGET /ADDRESS/json\n\nBoth https://ip-info.com and http://ip-info.com are supported. JSON lookups accept literal public IPs only. Private, reserved and special-purpose ranges are rejected. Duplicate/unknown parameters and conflicting path/query targets return 400. IPv4-mapped IPv6 is normalized.\n\n## Full example\n'+json.dumps(EXAMPLE,indent=2)+'\n\n## Response fields\n'
     full+='\n'.join(f'- {n} ({t}{" | null" if null else ""}): {d}' for n,t,null,_,d in FIELDS)
     full+='\n\n## Errors\n'+ '\n'.join(f'{status}: {c} — {d}' for status,(c,d) in ERRORS.items())+'\nError body: {"error":{"code":"invalid_ip","message":"Supply a literal IPv4 or IPv6 address."}}\nAPI responses use Cache-Control: no-store and allow public cross-origin GET. For temporary failures, use bounded exponential backoff. This release does not automatically update daily. Network classifications do not prove VPN/proxy use.\n\n## Code examples\n'
     for lang,label in LANGUAGES.items():

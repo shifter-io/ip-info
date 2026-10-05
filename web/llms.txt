@@ -2,7 +2,7 @@
 
 > Free public IP geolocation and ASN API. No signup. No API key. Maintained and supported by Shifter.
 
-Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
+Use GET https://ip-info.com/myip for only the caller's IP as plain text (address plus newline). Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
 
 ## Documentation
 - [API reference](https://ip-info.com/docs): Requests, response fields, errors and examples.

@@ -144,6 +144,7 @@ struct Params {
 
 pub fn app(state: Arc<AppState>) -> Router {
     let api = Router::new()
+        .route("/myip", get(my_ip))
         .route("/json", get(lookup_self))
         .route("/{ip}/json", get(lookup_path))
         .method_not_allowed_fallback(|| async {
@@ -355,8 +356,11 @@ async fn common(State(s): State<Arc<AppState>>, req: Request, next: Next) -> Res
             .map(|(k, v)| k.as_str().len() + v.len())
             .sum::<usize>();
     let path = req.uri().path();
-    let api_path =
-        path == "/json" || path.ends_with("/json") || path == "/healthz" || path == "/readyz";
+    let api_path = path == "/myip"
+        || path == "/json"
+        || path.ends_with("/json")
+        || path == "/healthz"
+        || path == "/readyz";
     let mut response = if size > 16384 {
         error(
             StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
@@ -436,6 +440,32 @@ async fn common(State(s): State<Arc<AppState>>, req: Request, next: Next) -> Res
     response
 }
 type ParsedParams = Result<Query<Params>, axum::extract::rejection::QueryRejection>;
+fn caller_ip(
+    config: &Config,
+    headers: &HeaderMap,
+    peer: Option<IpAddr>,
+) -> Result<IpAddr, &'static str> {
+    let peer = peer.ok_or("Unable to determine the caller IP.")?;
+    if !config.ingress_secret.is_empty() {
+        return network::authenticated_caller(headers, &config.ingress_secret);
+    }
+    network::caller(
+        peer,
+        headers,
+        &config.trusted_proxies,
+        &config.client_ip_header,
+    )
+}
+async fn my_ip(
+    State(s): State<Arc<AppState>>,
+    headers: HeaderMap,
+    peer: Option<axum::Extension<Peer>>,
+) -> Response {
+    match caller_ip(&s.config, &headers, peer.map(|p| p.0.0)) {
+        Ok(ip) => format!("{ip}\n").into_response(),
+        Err(e) => bad(e),
+    }
+}
 async fn lookup_self(
     State(s): State<Arc<AppState>>,
     params: ParsedParams,
@@ -476,20 +506,9 @@ fn lookup(
     }
     let ip = match path.or(query) {
         Some(ip) => ip,
-        None => match peer.map(|p| {
-            if !s.config.ingress_secret.is_empty() {
-                return network::authenticated_caller(&headers, &s.config.ingress_secret);
-            }
-            network::caller(
-                p,
-                &headers,
-                &s.config.trusted_proxies,
-                &s.config.client_ip_header,
-            )
-        }) {
-            Some(Ok(ip)) => ip,
-            Some(Err(e)) => return bad(e),
-            None => return bad("Unable to determine the caller IP."),
+        None => match caller_ip(&s.config, &headers, peer) {
+            Ok(ip) => ip,
+            Err(e) => return bad(e),
         },
     };
     if !network::public(ip) {

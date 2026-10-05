@@ -48,7 +48,7 @@ test('content and all examples work without JavaScript',async({browser,baseURL})
   const context=await browser.newContext({javaScriptEnabled:false,baseURL});
   const page=await context.newPage();
   await page.goto('/docs');
-  await expect(page.getByRole('heading',{name:'The full response'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'The full JSON response'})).toBeVisible();
   const examples=page.locator('.example-static'); await expect(examples).toHaveCount(9);
   await examples.nth(2).locator('summary').click();
   await expect(examples.nth(2).locator('pre').first()).toContainText('https://ip-info.com/json');
@@ -106,7 +106,7 @@ test('standalone documentation navigation works without JavaScript',async({brows
   await page.goto('file://'+path.resolve('web/index.html'));
   await page.getByRole('link',{name:'Documentation',exact:true}).click();
   await expect(page).toHaveURL(/\/web\/docs\.html$/);
-  await expect(page.getByRole('heading',{name:'The full response'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'The full JSON response'})).toBeVisible();
   await page.getByRole('link',{name:'Privacy',exact:true}).click();
   await expect(page.getByRole('heading',{level:1})).toHaveText('Your lookup, explained.');
   await context.close();

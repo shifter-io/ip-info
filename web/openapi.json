@@ -21,6 +21,99 @@
   ],
   "security": [],
   "paths": {
+    "/myip": {
+      "get": {
+        "operationId": "getMyIp",
+        "summary": "Return only the caller IP as plain text",
+        "description": "Returns the normalized IPv4 or IPv6 address followed by a newline. Uses the same trusted-proxy and authenticated-ingress rules as /json. Query parameters are ignored. No database is required; local/private caller addresses are returned too. Errors use the standard JSON envelope.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Caller IP address followed by a newline; no JSON wrapper.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "no-store"
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "8.8.8.8\n"
+              }
+            }
+          },
+          "400": {
+            "description": "Unable to determine the caller IP, or invalid/missing trusted-ingress headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "invalid_ip",
+                    "message": "Malformed, conflicting, non-public, or unsupported lookup input."
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Use GET for lookups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "method_not_allowed",
+                    "message": "Use GET for lookups."
+                  }
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Request headers exceed the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "request_too_large",
+                    "message": "Request headers exceed the configured limit."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Request timed out; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "timeout",
+                    "message": "Request timed out; retry later with backoff."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/json": {
       "get": {
         "operationId": "lookupIp",

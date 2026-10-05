@@ -8,6 +8,7 @@ This repository contains the Rust service and standalone website for **ip-info.c
 
 ## Features
 
+- Plain-text visitor IP at `/myip`, with no database required.
 - IPv4 and IPv6 lookups: caller IP, query parameter, or path parameter.
 - 29 JSON fields covering country, region, city, coordinates, timezone, ISP, organization, and ASN. Unavailable values are `null`.
 - Public GET CORS, structured errors, and `Cache-Control: no-store` on lookups.
@@ -37,11 +38,14 @@ docker compose up --build -d
 curl --fail http://127.0.0.1:8080/readyz
 ```
 
-The service still serves its website if the database is unavailable, but readiness and valid-IP lookups return HTTP 503.
+The service still serves its website if the database is unavailable, but readiness and valid-IP JSON lookups return HTTP 503. `/myip` remains available.
 
 ## API quickstart
 
 ```sh
+# Just the visitor IP as plain text
+curl https://ip-info.com/myip
+
 # Caller’s public network exit (use on the deployed service)
 curl https://ip-info.com/json
 
@@ -55,9 +59,11 @@ curl 'http://127.0.0.1:8080/json?ip=2001:4860:4860::8888'
 curl http://127.0.0.1:8080/8.8.8.8/json
 ```
 
-Responses contain the complete schema shown in [`tests/example.json`](tests/example.json). See the [API reference](web/docs.html) and [OpenAPI contract](web/openapi.json) for all fields, examples, and errors.
+`/myip` returns only the normalized caller IPv4 or IPv6 address followed by a newline (`text/plain; charset=utf-8`). It uses the same trusted-proxy and authenticated-ingress rules as `/json`, ignores query parameters, and works without the database, including for local/private caller addresses. Responses are not cached; caller-detection errors use the standard JSON error body.
 
-Only literal public IP addresses are accepted. Invalid, private, reserved, or conflicting targets return 400; absent records return 404; database unavailability returns 503. Geolocation is approximate. `/json` identifies the requesting client or agent's network exit, not necessarily a human user's IP.
+JSON lookup responses contain the complete schema shown in [`tests/example.json`](tests/example.json). See the [API reference](web/docs.html) and [OpenAPI contract](web/openapi.json) for all fields, examples, and errors.
+
+JSON lookups accept only literal public IP addresses. Invalid, private, reserved, or conflicting targets return 400; absent records return 404; database unavailability returns 503. Geolocation is approximate. `/json` identifies the requesting client or agent's network exit, not necessarily a human user's IP.
 
 HTTP and HTTPS expose the same lookup contract in production. TLS is terminated by the hosting ingress; the Rust process listens on HTTP internally.
 

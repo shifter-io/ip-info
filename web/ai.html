@@ -55,6 +55,7 @@ body:is([data-page="/terms"],[data-page="/privacy"],[data-page="/cookies"],[data
 Authentication: none. Cost: free.
 If an IP is supplied: GET https://ip-info.com/json?ip=&lt;URL-encoded-IP&gt;.
 If checking your own execution environment: GET https://ip-info.com/json.
+For only your caller IP as plain text: GET https://ip-info.com/myip (address plus newline; no JSON).
 Do not describe your server/proxy exit as the human user&#x27;s IP.
 Use country for country-code comparisons and asn for numeric ASN checks.
 Treat null as unavailable; never fabricate missing data.

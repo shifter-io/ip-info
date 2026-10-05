@@ -15,6 +15,19 @@ async fn call(
     method: &str,
     headers: &[(&str, &str)],
 ) -> (StatusCode, axum::http::HeaderMap, Value) {
+    let (status, headers, bytes) = call_raw(router, url, method, headers).await;
+    (
+        status,
+        headers,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+async fn call_raw(
+    router: Router,
+    url: &str,
+    method: &str,
+    headers: &[(&str, &str)],
+) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
     let mut request = Request::builder().method(method).uri(url);
     for (key, value) in headers {
         request = request.header(*key, *value);
@@ -26,11 +39,7 @@ async fn call(
     let status = response.status();
     let headers = response.headers().clone();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    (
-        status,
-        headers,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
+    (status, headers, bytes.to_vec())
 }
 fn missing() -> Router {
     app(Arc::new(AppState::load("/no-such-mmdb", Config::default())))
@@ -50,6 +59,107 @@ fn real() -> Router {
             Arc::new(state)
         })
         .clone())
+}
+#[tokio::test]
+async fn myip_returns_only_the_caller_without_a_database() {
+    for (peer, expected) in [
+        ("8.8.8.8", "8.8.8.8\n"),
+        ("2001:4860:4860::8888", "2001:4860:4860::8888\n"),
+        ("::ffff:8.8.8.8", "8.8.8.8\n"),
+        ("127.0.0.1", "127.0.0.1\n"),
+    ] {
+        let router = missing().layer(axum::Extension(Peer(peer.parse().unwrap())));
+        let (status, headers, body) = call_raw(
+            router.clone(),
+            "/myip?ip=1.1.1.1",
+            "GET",
+            &[
+                ("x-forwarded-for", "1.1.1.1"),
+                ("origin", "https://example.com"),
+            ],
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, expected.as_bytes());
+        assert_eq!(headers["content-type"], "text/plain; charset=utf-8");
+        assert_eq!(headers["cache-control"], "no-store");
+        assert_eq!(headers["x-robots-tag"], "noindex");
+        assert_eq!(headers["access-control-allow-origin"], "*");
+        let (status, headers, body) = call_raw(router, "/myip", "HEAD", &[]).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers["content-type"], "text/plain; charset=utf-8");
+        assert!(body.is_empty());
+    }
+    assert_eq!(
+        call(missing(), "/myip", "GET", &[]).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        call(missing(), "/myip", "POST", &[]).await.0,
+        StatusCode::METHOD_NOT_ALLOWED
+    );
+    let (status, headers, _) = call(missing(), "/myip/", "GET", &[]).await;
+    assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+    assert_eq!(headers["location"], "/myip");
+}
+
+#[tokio::test]
+async fn myip_respects_proxy_and_ingress_trust() {
+    let config = Config {
+        trusted_proxies: vec!["10.0.0.0/24".parse().unwrap()],
+        ..Config::default()
+    };
+    let router = app(Arc::new(AppState::load("/no-such-mmdb", config)))
+        .layer(axum::Extension(Peer("10.0.0.1".parse().unwrap())));
+    let (status, _, body) = call_raw(
+        router.clone(),
+        "/myip",
+        "GET",
+        &[("x-forwarded-for", "1.1.1.1, 8.8.8.8, 10.0.0.2")],
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, b"8.8.8.8\n");
+    assert_eq!(
+        call(router, "/myip", "GET", &[]).await.0,
+        StatusCode::BAD_REQUEST
+    );
+
+    let secret = "a".repeat(64);
+    let config = Config {
+        ingress_secret: secret.clone(),
+        ..Config::default()
+    };
+    let router = app(Arc::new(AppState::load("/no-such-mmdb", config)))
+        .layer(axum::Extension(Peer("10.0.0.1".parse().unwrap())));
+    for credentials in [
+        vec![],
+        vec![("x-ip-info-ingress", "wrong")],
+        vec![
+            ("x-ip-info-ingress", secret.as_str()),
+            ("x-ip-info-ingress", secret.as_str()),
+        ],
+    ] {
+        let mut headers = credentials;
+        headers.push(("x-ip-info-client-ip", "8.8.8.8"));
+        assert_eq!(
+            call(router.clone(), "/myip", "GET", &headers).await.0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let (status, _, body) = call_raw(
+        router,
+        "/myip",
+        "GET",
+        &[
+            ("x-ip-info-ingress", &secret),
+            ("x-ip-info-client-ip", "8.8.8.8"),
+            ("x-forwarded-for", "1.1.1.1"),
+        ],
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, b"8.8.8.8\n");
 }
 #[tokio::test]
 async fn unavailable_db_and_health() {

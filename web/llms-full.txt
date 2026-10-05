@@ -2,7 +2,7 @@
 
 > Free public IP geolocation and ASN API. No signup. No API key. Maintained and supported by Shifter.
 
-Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
+Use GET https://ip-info.com/myip for only the caller's IP as plain text (address plus newline). Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
 
 ## Documentation
 - [API reference](https://ip-info.com/docs): Requests, response fields, errors and examples.
@@ -18,6 +18,7 @@ Use IP Info for approximate public-IP geolocation and ASN lookup.
 Authentication: none. Cost: free.
 If an IP is supplied: GET https://ip-info.com/json?ip=<URL-encoded-IP>.
 If checking your own execution environment: GET https://ip-info.com/json.
+For only your caller IP as plain text: GET https://ip-info.com/myip (address plus newline; no JSON).
 Do not describe your server/proxy exit as the human user's IP.
 Use country for country-code comparisons and asn for numeric ASN checks.
 Treat null as unavailable; never fabricate missing data.
@@ -26,11 +27,12 @@ Geolocation is approximate. This is not VPN/proxy detection.
 Handle JSON errors and use bounded backoff for temporary failures.
 
 ## Request routes
+GET /myip (plain-text caller IP plus newline; ignores query parameters; no database required; local/private caller IPs allowed; standard JSON errors)
 GET /json
 GET /json?ip=ADDRESS
 GET /ADDRESS/json
 
-Both https://ip-info.com and http://ip-info.com are supported. Literal IPs only. Private, reserved and special-purpose ranges are rejected. Duplicate/unknown parameters and conflicting path/query targets return 400. IPv4-mapped IPv6 is normalized.
+Both https://ip-info.com and http://ip-info.com are supported. JSON lookups accept literal public IPs only. Private, reserved and special-purpose ranges are rejected. Duplicate/unknown parameters and conflicting path/query targets return 400. IPv4-mapped IPv6 is normalized.
 
 ## Full example
 {
