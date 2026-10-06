@@ -1,6 +1,32 @@
 (() => {
   'use strict';
   const $ = (q) => document.querySelector(q);
+  const menuToggle = $('.menu-toggle');
+  const headerInner = $('.header-inner');
+  if (menuToggle && headerInner) {
+    const closeMenu = () => {
+      headerInner.classList.remove('menu-open');
+      menuToggle.setAttribute('aria-expanded', 'false');
+      menuToggle.setAttribute('aria-label', 'Open menu');
+    };
+    headerInner.classList.add('menu-ready');
+    menuToggle.hidden = false;
+    menuToggle.addEventListener('click', () => {
+      const open = headerInner.classList.toggle('menu-open');
+      menuToggle.setAttribute('aria-expanded', String(open));
+      menuToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    });
+    headerInner.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && menuToggle.getAttribute('aria-expanded') === 'true') {
+        closeMenu();
+        menuToggle.focus();
+      }
+    });
+    $('#main-navigation').addEventListener('click', event => {
+      if (event.target.closest('a')) closeMenu();
+    });
+    matchMedia('(max-width:768px)').addEventListener('change', closeMenu);
+  }
   const storageKey = 'ipinfo-analytics-consent-v1';
   const measurement = document.body.dataset.ga4 || '';
   const hasAnalytics = /^G-[A-Z0-9]{4,22}$/.test(measurement);

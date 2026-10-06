@@ -61,6 +61,8 @@ async function run(action) {
 }
 $('navigate').addEventListener('submit', event => {
   event.preventDefault(); if (current.busy || !configured) return;
+  // Release the mobile keyboard before the SDK opens verification.
+  $('address').blur();
   run(async () => {
     if (document.body.classList.contains('is-browsing') && current.active) await proxy.navigate($('address').value);
     else await proxy.search({url:$('address').value,country:$('country').value});

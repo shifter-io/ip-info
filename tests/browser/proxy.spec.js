@@ -27,12 +27,22 @@ test('Web Proxy keeps shared branding and navigation on desktop and mobile',asyn
   for (const width of [1440,1024,820,768,390,320]) {
     await page.setViewportSize({width,height:950});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    if(width<=1000) {
+      expect(await page.locator('#address').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+      await page.locator('#address').fill('example.com');
+      await expect(page.locator('#go')).toBeInViewport();
+    }
+    if(width<=768) {
+      await expect(page.locator('.nav')).toBeHidden();
+      await page.getByRole('button',{name:'Open menu',exact:true}).click();
+    } else await expect(page.locator('.menu-toggle')).toBeHidden();
     await expect(page.locator('.nav').getByRole('link',{name:'Web Proxy',exact:true})).toBeInViewport();
     const boxes=await page.locator('.header-inner > *').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width};}).filter(r=>r.width));
     for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++) {
       const a=boxes[i],b=boxes[j]; expect(a.right<=b.x+1||b.right<=a.x+1||a.bottom<=b.y+1||b.bottom<=a.y+1).toBe(true);
     }
     if([1440,390].includes(width))await page.screenshot({path:info.outputPath(`landing-${width}.png`),fullPage:true});
+    if(width<=768) await page.getByRole('button',{name:'Close menu',exact:true}).click();
   }
   expect(errors).toEqual([]);
 });
@@ -55,6 +65,7 @@ test('SDK controls preserve the session across home, resume, navigation and coun
   for (const width of [1440,1024,768,390,320]) {
     await page.setViewportSize({width,height:844});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    if(width<=1000) expect(await page.locator('#address').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
     await expect(page.locator('#home')).toBeInViewport();await expect(page.locator('#go')).toBeInViewport();
     await expect(page.locator('#session-menu')).toBeInViewport();
     expect(await page.locator('#address').evaluate(n=>n.getBoundingClientRect().width)).toBeGreaterThan(40);

@@ -35,3 +35,28 @@ body.is-browsing #web-proxy .hero { padding:0; }
 #web-proxy .browser-brand.browser-only { display:none; }
 body.is-browsing #web-proxy .browser-brand.browser-only { display:flex; }
 #web-proxy .faq summary::after { display:none; }
+
+@media(max-width:768px) { #web-proxy .hero { padding-top:64px; } }
+
+/* Keep editable fields at Safari's readable size before they receive focus. */
+@media(max-width:1000px), (pointer:coarse) {
+  #web-proxy #address, #web-proxy #country-search { font-size:16px; }
+}
+
+/* The hosted SDK appends verification outside #web-proxy. Leave room for
+   Google's 304px widget and allow scrolling on short phone screens. */
+body > .shifter-web-proxy-backdrop {
+  box-sizing:border-box;
+  height:100dvh;
+  padding:10px;
+  overflow:auto;
+}
+body > .shifter-web-proxy-backdrop > .shifter-web-proxy-verification {
+  width:min(390px,100%);
+  max-width:100%;
+  max-height:calc(100dvh - 20px);
+  overflow:auto;
+}
+@media(max-width:600px) {
+  body > .shifter-web-proxy-backdrop > .shifter-web-proxy-verification { padding:20px; }
+}

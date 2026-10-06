@@ -59,7 +59,25 @@ test('mobile layout, keyboard and visual captures',async({page},testInfo)=>{
   await page.screenshot({path:testInfo.outputPath('home-desktop.png'),fullPage:true});
   for (const width of [390,320]) {
     await page.setViewportSize({width,height:844});
+    expect(await page.locator('#ip-input').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const menu=page.locator('.menu-toggle');
+    await expect(page.locator('.nav')).toBeHidden();
+    const brand=await page.locator('.header-inner > .brand').boundingBox();
+    const toggle=await menu.boundingBox();
+    expect(toggle.x).toBeGreaterThan(brand.x+brand.width);
+    expect(Math.abs(toggle.y+toggle.height/2-brand.y-brand.height/2)).toBeLessThan(2);
+    const before=await page.locator('#main').boundingBox();
+    await menu.focus();await page.keyboard.press('Enter');
+    await expect(menu).toHaveAttribute('aria-expanded','true');
+    await expect(page.locator('.nav')).toBeVisible();
+    const after=await page.locator('#main').boundingBox();
+    expect(after.y-before.y).toBeGreaterThan(180);
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.nav a').first()).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeFocused();
+    await expect(page.locator('.nav')).toBeHidden();
   }
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:testInfo.outputPath('home-mobile.png'),fullPage:true});
