@@ -1,6 +1,31 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs');
 const path=require('node:path');
+test('every page keeps clean search metadata and loads crawlable icons',async({page,request})=>{
+  const titles = new Set();
+  for (const route of ['/','/docs','/ai','/about','/terms','/privacy','/cookies','/missing/nested-page']) {
+    const response = await page.goto(route);
+    expect(response.status()).toBe(route.startsWith('/missing') ? 404 : 200);
+    expect(await response.text()).not.toMatch(/__cp|cpLocation|\uFFFD/i);
+    const title = await page.title();
+    expect(title.length).toBeGreaterThan(0);
+    expect(titles.has(title)).toBe(false);titles.add(title);
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content',title);
+    await expect(page.locator('meta[name="twitter:title"]')).toHaveAttribute('content',title);
+    expect(await page.locator('body').innerText()).not.toMatch(/__cp|cpLocation|\uFFFD/i);
+    const icons = await page.locator('link[rel="icon"]').evaluateAll(links => links.map(e=>e.getAttribute('href')));
+    expect(icons).toEqual(['/favicon.ico','/favicon.png','/favicon.svg']);
+    // Exercise the browser's decoders as well as server status/MIME types.
+    for (const [url,type] of [['/favicon.ico','image/x-icon'],['/favicon.png','image/png'],['/favicon.svg','image/svg+xml']]) {
+      const icon = await request.get(url);
+      expect(icon.status()).toBe(200);expect(icon.headers()['content-type']).toBe(type);
+      expect(await page.evaluate(async url=>{
+        const image=new Image();image.src=url;await image.decode();
+        return image.naturalWidth>0 && image.naturalWidth===image.naturalHeight;
+      },url)).toBe(true);
+    }
+  }
+});
 test('desktop lookup, examples, metadata and navigation',async({page})=>{
   await page.goto('/');
   await expect(page).toHaveTitle('Free IP Geolocation & ASN API — No API Key | IP Info');

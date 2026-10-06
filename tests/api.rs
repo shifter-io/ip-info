@@ -61,6 +61,49 @@ fn real() -> Router {
         .clone())
 }
 #[tokio::test]
+async fn production_favicons_are_crawlable_without_a_database() {
+    let router = app(Arc::new(AppState::load(
+        "/no-such-mmdb",
+        Config {
+            indexable: true,
+            ..Config::default()
+        },
+    )));
+    for (path, content_type, expected) in [
+        (
+            "/favicon.ico",
+            "image/x-icon",
+            &include_bytes!("../web/favicon.ico")[..],
+        ),
+        (
+            "/favicon.png",
+            "image/png",
+            &include_bytes!("../web/favicon.png")[..],
+        ),
+        (
+            "/favicon.svg",
+            "image/svg+xml",
+            &include_bytes!("../web/favicon.svg")[..],
+        ),
+    ] {
+        let (status, headers, body) = call_raw(router.clone(), path, "GET", &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert_eq!(headers["content-type"], content_type);
+        assert!(!headers.contains_key("x-robots-tag"));
+        assert_eq!(body, expected);
+        let (status, headers, body) = call_raw(router.clone(), path, "HEAD", &[]).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers["content-type"], content_type);
+        assert!(body.is_empty());
+    }
+    let (_, _, robots) = call_raw(router, "/robots.txt", "GET", &[]).await;
+    assert!(
+        String::from_utf8(robots)
+            .unwrap()
+            .contains("User-agent: *\nAllow: /")
+    );
+}
+#[tokio::test]
 async fn myip_returns_only_the_caller_without_a_database() {
     for (peer, expected) in [
         ("8.8.8.8", "8.8.8.8\n"),

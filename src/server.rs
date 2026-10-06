@@ -300,6 +300,24 @@ pub fn app(state: Arc<AppState>) -> Router {
             }),
         )
         .route(
+            "/favicon.ico",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "image/x-icon")],
+                    &include_bytes!("../web/favicon.ico")[..],
+                )
+            }),
+        )
+        .route(
+            "/favicon.png",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "image/png")],
+                    &include_bytes!("../web/favicon.png")[..],
+                )
+            }),
+        )
+        .route(
             "/favicon.svg",
             get(|| async {
                 (

@@ -8,6 +8,7 @@ from examples import EXAMPLES, LANGUAGES
 ROOT=Path(__file__).resolve().parents[1]
 WEB=ROOT/'web'; WEB.mkdir(exist_ok=True)
 DATE='2026-09-29'
+SITE_MODIFIED='2026-10-06'
 escape=html.escape
 CSS='@font-face{font-family:Geist;src:url(data:font/woff2;base64,'+base64.b64encode((ROOT/'site/geist.woff2').read_bytes()).decode()+') format("woff2");font-weight:100 900;font-display:swap;}'+(ROOT/'site/style.css').read_text()
 LOGO=(ROOT/'site/shifter-logo.svg').read_text()
@@ -44,9 +45,14 @@ def document(path, title, desc, body, extra=''):
     meta_image = 'home' if path == '/' or path not in PAGES else path.strip('/')
     nav=''.join(f'<a href="{route}"'+(' aria-current="page"' if path==route else '')+f'>{label}</a>' for route,label in [('/docs','Documentation'),('/ai','For AI agents'),('/about','About')])
     from urllib.parse import quote
+    # Public pages need crawlable favicon URLs; the offline operations guide is self-contained.
+    icons = (f'<link rel="icon" href="data:image/svg+xml,{quote(ICON)}">' if path == '/operations' else
+             '<link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16 32x32 48x48">'
+             '<link rel="icon" href="/favicon.png" type="image/png" sizes="96x96">'
+             '<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">')
     structured={'@context':'https://schema.org','@graph':[{'@type':'Organization','@id':'https://shifter.io/#organization','name':'Shifter','url':'https://shifter.io'}, {'@type':'WebSite','@id':'https://ip-info.com/#website','name':'IP Info','url':'https://ip-info.com/','publisher':{'@id':'https://shifter.io/#organization'}}, {'@type':'WebApplication','name':'IP Info','url':'https://ip-info.com/','applicationCategory':'DeveloperApplication','operatingSystem':'Any','isAccessibleForFree':True,'offers':{'@type':'Offer','price':'0','priceCurrency':'USD'},'publisher':{'@id':'https://shifter.io/#organization'}}]}
     output = f'''<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(title)}</title><meta name="description" content="{escape(desc)}"><link rel="canonical" href="https://ip-info.com{path}"><meta name="theme-color" content="#080c16"><meta name="referrer" content="no-referrer"><meta property="og:type" content="website"><meta property="og:site_name" content="IP Info"><meta property="og:title" content="{escape(title)}"><meta property="og:description" content="{escape(desc)}"><meta property="og:url" content="https://ip-info.com{path}"><meta property="og:image" content="https://ip-info.com/meta/{meta_image}.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{escape(title)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{escape(title)}"><meta name="twitter:description" content="{escape(desc)}"><meta name="twitter:image" content="https://ip-info.com/meta/{meta_image}.png"><link rel="icon" href="data:image/svg+xml,{quote(ICON)}"><link rel="alternate" type="application/json" href="/openapi.json" title="OpenAPI specification"><style>{CSS}</style><script type="application/ld+json">{json.dumps(structured)}</script>{extra}</head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(title)}</title><meta name="description" content="{escape(desc)}"><link rel="canonical" href="https://ip-info.com{path}"><meta name="theme-color" content="#080c16"><meta name="referrer" content="no-referrer"><meta property="og:type" content="website"><meta property="og:site_name" content="IP Info"><meta property="og:title" content="{escape(title)}"><meta property="og:description" content="{escape(desc)}"><meta property="og:url" content="https://ip-info.com{path}"><meta property="og:image" content="https://ip-info.com/meta/{meta_image}.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{escape(title)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{escape(title)}"><meta name="twitter:description" content="{escape(desc)}"><meta name="twitter:image" content="https://ip-info.com/meta/{meta_image}.png">{icons}<link rel="alternate" type="application/json" href="/openapi.json" title="OpenAPI specification"><style>{CSS}</style><script type="application/ld+json">{json.dumps(structured)}</script>{extra}</head>
 <body data-page="{path}" data-ga4="__GA4_ID__"><a class="skip" href="#main">Skip to content</a><header class="site-header"><div class="wrap header-inner"><a class="brand" href="/" aria-label="IP Info home">IP Info<span class="brand-divider" aria-hidden="true"></span><span class="by">by</span><span class="shifter-logo" aria-label="Shifter">{LOGO}</span></a><nav class="nav" aria-label="Main navigation">{nav}</nav><a class="button primary small header-action" href="/#lookup">Check an IP <span aria-hidden="true">↗</span></a></div></header>
 <main id="main">{body}</main>
 <footer class="site-footer"><div class="wrap footer-unified"><div class="footer-identity"><a class="brand" href="/">IP Info<span class="brand-divider" aria-hidden="true"></span><span class="shifter-logo" aria-label="Shifter">{LOGO}</span></a><p>Free IP intelligence for the things you build.<br>Maintained and supported by <a href="https://shifter.io">Shifter</a>.</p><small>© 2026 Shifter · IP Info</small></div><nav class="footer-navigation" aria-label="Footer navigation"><div class="footer-links"><a href="/docs">API docs</a><a href="/ai">AI agents</a><a href="/llms.txt">llms.txt</a><a href="/openapi.json">OpenAPI</a><a href="mailto:hi@shifter.io">Support</a></div><div class="footer-links footer-legal"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/cookies">Cookies</a><button type="button" data-cookie-preferences>Cookie preferences</button></div></nav></div></footer>
@@ -77,7 +83,10 @@ def document(path, title, desc, body, extra=''):
             return match.group(0)
         if path == '/operations': filename = '../web/' + filename
         return match.group(1) + filename + (marker + fragment if marker else '') + '"'
-    return re.sub(r'(<a[^>]*href=")([^"]+)"', local_link, output)
+    output = re.sub(r'(<a[^>]*href=")([^"]+)"', local_link, output)
+    if re.search(r'__cp|cpLocation|\ufffd', output, re.I):
+        raise ValueError(f'Corrupted text in generated page: {path}')
+    return output
 
 def article(eyebrow, title, intro, content):
     return f'<div class="wrap"><header class="page-hero"><p class="eyebrow">{eyebrow}</p><h1>{title}</h1><p class="lead">{intro}</p></header><article class="prose">{content}</article></div>'
@@ -157,7 +166,7 @@ Use GET https://ip-info.com/myip for only the caller's IP as plain text (address
     full+='\n## Shifter proxy exit example\n'+proxy+'\n'
     (WEB/'llms-full.txt').write_text(full)
     (WEB/'robots.txt').write_text('User-agent: *\nAllow: /\nSitemap: https://ip-info.com/sitemap.xml\n')
-    (WEB/'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join(f'<url><loc>https://ip-info.com{path}</loc><lastmod>{DATE}</lastmod></url>' for path in PAGES)+'</urlset>\n')
+    (WEB/'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join(f'<url><loc>https://ip-info.com{path}</loc><lastmod>{SITE_MODIFIED}</lastmod></url>' for path in PAGES)+'</urlset>\n')
     (ROOT/'docs/operations.html').write_text(document('/operations','IP Info — Build and deployment guide','Local operation, Bunny deployment, validation and launch checks.',(ROOT/'site/operations.html').read_text(),'<meta name="robots" content="noindex">'))
     subprocess.run(['rustfmt', str(ROOT/'src/response.rs')],check=True)
     print('Generated 8 standalone pages, OpenAPI, agent references, sitemap and Rust response type.')
