@@ -167,6 +167,10 @@ pub fn app(state: Arc<AppState>) -> Router {
             get(|| async { Html(include_str!("../web/index.html")) }),
         )
         .route(
+            "/web-proxy",
+            get(|| async { Html(include_str!("../web/web-proxy.html")) }),
+        )
+        .route(
             "/docs",
             get(|| async { Html(include_str!("../web/docs.html")) }),
         )
@@ -242,6 +246,15 @@ pub fn app(state: Arc<AppState>) -> Router {
                 (
                     [(header::CONTENT_TYPE, "image/png")],
                     &include_bytes!("../web/meta/home.png")[..],
+                )
+            }),
+        )
+        .route(
+            "/meta/web-proxy.png",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "image/png")],
+                    &include_bytes!("../web/meta/web-proxy.png")[..],
                 )
             }),
         )
@@ -416,6 +429,7 @@ async fn common(State(s): State<Arc<AppState>>, req: Request, next: Next) -> Res
             for (file, route) in [
                 ("index.html", "/"),
                 ("docs.html", "/docs"),
+                ("web-proxy.html", "/web-proxy"),
                 ("ai.html", "/ai"),
                 ("about.html", "/about"),
                 ("terms.html", "/terms"),

@@ -241,6 +241,35 @@ async fn invalid_inputs_and_methods() {
     assert_eq!(v["error"]["code"], "method_not_allowed");
 }
 #[tokio::test]
+async fn proxy_page_and_brand_assets_are_embedded_without_a_database() {
+    let router = app(Arc::new(AppState::load(
+        "/no-such-mmdb",
+        Config {
+            indexable: true,
+            ..Config::default()
+        },
+    )));
+    let (status, headers, bytes) = call_raw(router.clone(), "/web-proxy", "GET", &[]).await;
+    assert!(!headers.contains_key("x-robots-tag"));
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        headers["content-type"]
+            .to_str()
+            .unwrap()
+            .starts_with("text/html")
+    );
+    let page = String::from_utf8(bytes).unwrap();
+    assert!(page.contains("https://web.p.shifter.io/sdk/v1/shifter-web-proxy.js"));
+    assert!(page.contains("href=\"/web-proxy\" aria-current=\"page\""));
+    assert!(!page.contains("href=\"web-proxy.html\""));
+    assert!(!page.contains("__IP_INFO_BRAND__"));
+    let (status, headers, image) = call_raw(router, "/meta/web-proxy.png", "GET", &[]).await;
+    assert!(!headers.contains_key("x-robots-tag"));
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(headers["content-type"], "image/png");
+    assert!(image.starts_with(b"\x89PNG\r\n\x1a\n"));
+}
+#[tokio::test]
 async fn cors_and_site_routes() {
     let (_, h, _) = call(
         missing(),

@@ -1,0 +1,218 @@
+[
+  {
+    "code": "us",
+    "name": "United States"
+  },
+  {
+    "code": "gb",
+    "name": "United Kingdom"
+  },
+  {
+    "code": "ca",
+    "name": "Canada"
+  },
+  {
+    "code": "de",
+    "name": "Germany"
+  },
+  {
+    "code": "it",
+    "name": "Italy"
+  },
+  {
+    "code": "fr",
+    "name": "France"
+  },
+  {
+    "code": "nl",
+    "name": "Netherlands"
+  },
+  {
+    "code": "es",
+    "name": "Spain"
+  },
+  {
+    "code": "pt",
+    "name": "Portugal"
+  },
+  {
+    "code": "jp",
+    "name": "Japan"
+  },
+  {
+    "code": "kr",
+    "name": "South Korea"
+  },
+  {
+    "code": "sg",
+    "name": "Singapore"
+  },
+  {
+    "code": "pl",
+    "name": "Poland"
+  },
+  {
+    "code": "cz",
+    "name": "Czech Republic"
+  },
+  {
+    "code": "gr",
+    "name": "Greece"
+  },
+  {
+    "code": "hu",
+    "name": "Hungary"
+  },
+  {
+    "code": "ro",
+    "name": "Romania"
+  },
+  {
+    "code": "hr",
+    "name": "Croatia"
+  },
+  {
+    "code": "si",
+    "name": "Slovenia"
+  },
+  {
+    "code": "bg",
+    "name": "Bulgaria"
+  },
+  {
+    "code": "rs",
+    "name": "Serbia"
+  },
+  {
+    "code": "ua",
+    "name": "Ukraine"
+  },
+  {
+    "code": "ru",
+    "name": "Russia"
+  },
+  {
+    "code": "tr",
+    "name": "Turkey"
+  },
+  {
+    "code": "ae",
+    "name": "United Arab Emirates"
+  },
+  {
+    "code": "sa",
+    "name": "Saudi Arabia"
+  },
+  {
+    "code": "il",
+    "name": "Israel"
+  },
+  {
+    "code": "tw",
+    "name": "Taiwan"
+  },
+  {
+    "code": "br",
+    "name": "Brazil"
+  },
+  {
+    "code": "mx",
+    "name": "Mexico"
+  },
+  {
+    "code": "ar",
+    "name": "Argentina"
+  },
+  {
+    "code": "cl",
+    "name": "Chile"
+  },
+  {
+    "code": "co",
+    "name": "Colombia"
+  },
+  {
+    "code": "pe",
+    "name": "Peru"
+  },
+  {
+    "code": "za",
+    "name": "South Africa"
+  },
+  {
+    "code": "my",
+    "name": "Malaysia"
+  },
+  {
+    "code": "th",
+    "name": "Thailand"
+  },
+  {
+    "code": "cn",
+    "name": "China"
+  },
+  {
+    "code": "kz",
+    "name": "Kazakhstan"
+  },
+  {
+    "code": "dz",
+    "name": "Algeria"
+  },
+  {
+    "code": "bd",
+    "name": "Bangladesh"
+  },
+  {
+    "code": "by",
+    "name": "Belarus"
+  },
+  {
+    "code": "eg",
+    "name": "Egypt"
+  },
+  {
+    "code": "gh",
+    "name": "Ghana"
+  },
+  {
+    "code": "in",
+    "name": "India"
+  },
+  {
+    "code": "id",
+    "name": "Indonesia"
+  },
+  {
+    "code": "ir",
+    "name": "Iran"
+  },
+  {
+    "code": "ma",
+    "name": "Morocco"
+  },
+  {
+    "code": "np",
+    "name": "Nepal"
+  },
+  {
+    "code": "ng",
+    "name": "Nigeria"
+  },
+  {
+    "code": "ph",
+    "name": "Philippines"
+  },
+  {
+    "code": "lk",
+    "name": "Sri Lanka"
+  },
+  {
+    "code": "ve",
+    "name": "Venezuela"
+  },
+  {
+    "code": "vn",
+    "name": "Vietnam"
+  }
+]

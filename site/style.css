@@ -48,3 +48,11 @@ body:is([data-page="/terms"],[data-page="/privacy"],[data-page="/cookies"],[data
 
 /* Full-width companion card for the proxy verification workflow. */
 .shifter-verification{margin-top:22px;padding:36px 32px 26px;border-radius:16px;background:radial-gradient(ellipse at 15% 0,#2b7fff0b,transparent 65%),linear-gradient(135deg,#ffffff06,#ffffff02);column-gap:64px;row-gap:24px}.shifter-verification .shifter-free-note{grid-column:1/-1;max-width:none;margin:0;text-align:left;font-size:12px;color:#74829a}.shifter-verification .shifter-logo{margin-bottom:16px}.shifter-verification h3{margin-top:0}@media(max-width:680px){.shifter-verification{padding:28px 24px;gap:28px}.shifter-verification .shifter-free-note{font-size:11px;line-height:1.7}}
+
+/* The additional link keeps the same menu layout, with room at tablet widths. */
+@media(min-width:769px) and (max-width:1100px) {
+  .header-inner > .nav { gap:18px; font-size:12px; }
+  .header-inner { grid-template-columns:auto 1fr auto; gap:16px; }
+  .header-action { font-size:12px; padding-inline:10px; }
+}
+@media(max-width:768px) { .header-inner > .nav { gap:12px 20px; flex-wrap:wrap; } }

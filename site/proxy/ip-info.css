@@ -1,0 +1,37 @@
+/* Keep IP Info's shared navigation/footer and isolate the approved proxy layout. */
+#web-proxy { line-height:normal; -webkit-font-smoothing:antialiased; }
+#web-proxy .orbit-copy p { margin:1em 0; }
+/* Match the approved form; do not inherit IP lookup label/input spacing. */
+#web-proxy .url-label { margin:0; font-size:inherit; }
+#web-proxy #address, #web-proxy #country-search { padding:1px 2px; }
+#web-proxy .hero { padding-top:165px; background:transparent; }
+#web-proxy .eyebrow { text-transform:none; letter-spacing:normal; }
+#web-proxy a:hover { text-decoration:none; }
+#web-proxy .hero h1 { max-width:none; }
+#web-proxy .faq { display:block; max-width:none; }
+#web-proxy .faq details { margin:0; padding:0; }
+#web-proxy .brand { display:flex; gap:10px; font-size:20px; font-weight:750; letter-spacing:-.6px; white-space:nowrap; }
+#web-proxy .brand .by { display:inline; padding:0; margin:0; border:0; font-size:11px; color:#979ba7; font-weight:450; letter-spacing:0; }
+#web-proxy .brand .shifter-logo { display:inline-flex; }
+#web-proxy .brand .shifter-logo svg { width:86px; height:24px; }
+#web-proxy .brand .brand-divider { height:25px; }
+#web-proxy .browser-brand:focus-visible { outline:2px solid #91a0b7; outline-offset:3px; }
+#web-proxy .loading-brand { font-size:26px; }
+#web-proxy .loading-brand .shifter-logo svg { width:115px; height:32px; }
+#web-proxy .proxy-noscript { text-align:center; color:#efd19d; }
+body[data-page="/web-proxy"].is-browsing > .site-header,
+body[data-page="/web-proxy"].is-browsing > .site-footer { display:none; }
+body.is-browsing #web-proxy .hero { padding:0; }
+@media(max-width:700px) {
+  body.is-browsing #web-proxy .search-shell { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; padding:8px 10px; }
+  #web-proxy .browser-brand { width:auto; justify-content:flex-start; height:32px; padding:0; grid-column:1; grid-row:1; }
+  body.is-browsing #web-proxy #navigate { grid-column:1 / -1; grid-row:2; width:100%; }
+  #web-proxy #session-menu { grid-column:2; grid-row:1; }
+  #web-proxy .session-popover { right:0; max-width:calc(100vw - 20px); }
+  #web-proxy .brand { font-size:18px; gap:8px; }
+  #web-proxy .brand .shifter-logo svg { width:78px; height:22px; }
+  #web-proxy .country-showcase { margin-inline:0; max-width:100%; }
+}
+#web-proxy .browser-brand.browser-only { display:none; }
+body.is-browsing #web-proxy .browser-brand.browser-only { display:flex; }
+#web-proxy .faq summary::after { display:none; }

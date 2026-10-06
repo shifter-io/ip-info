@@ -4,7 +4,7 @@
   const storageKey = 'ipinfo-analytics-consent-v1';
   const measurement = document.body.dataset.ga4 || '';
   const hasAnalytics = /^G-[A-Z0-9]{4,22}$/.test(measurement);
-  const allowedPages = new Set(['/', '/docs', '/ai', '/about', '/terms', '/privacy', '/cookies']);
+  const allowedPages = new Set(['/', '/web-proxy', '/docs', '/ai', '/about', '/terms', '/privacy', '/cookies']);
   const canonicalPath = allowedPages.has(document.body.dataset.page) ? document.body.dataset.page : '/';
   let consent = 'denied', gaLoaded = false;
   try {

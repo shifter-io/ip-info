@@ -1,0 +1,126 @@
+<div id="web-proxy"><svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+  <symbol id="chevron" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></symbol>
+  <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-5"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 3M4 16l2 3a8 8 0 0 0 13-2"/></symbol>
+  <symbol id="home-icon" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/></symbol>
+  <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="logout" viewBox="0 0 24 24"><path d="M9 4H5v16h4m5-12 4 4-4 4m-5-4h12"/></symbol>
+  <symbol id="menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></symbol>
+</defs></svg>
+  <section class="hero" aria-labelledby="hero-title">
+    <noscript><p class="proxy-noscript">Enable JavaScript to use the web proxy.</p></noscript><div class="hero-copy landing-only">
+      <div class="eyebrow"><svg class="icon"><use href="#globe"/></svg> Free online web proxy</div>
+      <h1 id="hero-title">Free web proxy.<br><span>A whole new perspective.</span></h1>
+      <p class="hero-description">Explore the web with Shifter’s free web proxy.<br>Choose a country, enter a website, and you’re there.</p>
+    </div>
+    <section id="browser" aria-label="Start browsing" tabindex="-1">
+      <div class="search-shell">
+        <button id="home" class="browser-brand brand browser-only" type="button" aria-label="Back to Web Proxy" title="Back to Web Proxy">__IP_INFO_BRAND__</button>
+        <form id="navigate">
+          <div class="navigation browser-only"><button id="back" class="icon-button" type="button" title="Back" aria-label="Back"><svg class="icon reverse"><use href="#arrow"/></svg></button><button id="forward" class="icon-button" type="button" title="Forward" aria-label="Forward"><svg class="icon"><use href="#arrow"/></svg></button><button id="reload" class="icon-button" type="button" title="Reload" aria-label="Reload"><svg class="icon"><use href="#refresh"/></svg></button></div>
+          <div id="country-picker" class="country-label">
+            <input id="country" type="hidden" value="us">
+            <button id="country-trigger" type="button" role="combobox" aria-label="Exit country" aria-describedby="country-name" aria-haspopup="listbox" aria-controls="country-options" aria-expanded="false" disabled><img id="country-flag" src="/assets/flags/us.svg" width="18" height="18" alt=""><span id="country-name">United States</span><svg class="icon"><use href="#chevron"/></svg></button>
+            <div id="country-popup" class="country-popup" hidden>
+              <label class="country-search-label"><svg class="icon"><use href="#search"/></svg><input id="country-search" type="search" placeholder="Search countries" aria-label="Search countries" autocomplete="off" spellcheck="false"></label>
+              <div id="country-options" role="listbox" aria-label="Available countries" tabindex="0"></div>
+              <p id="country-empty" role="status" hidden>No countries found.</p>
+            </div>
+          </div>
+          <label class="url-label"><svg class="icon"><use href="#search"/></svg><span class="sr-only">Website address</span><input id="address" aria-label="Website address" placeholder="Enter a website URL" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" required></label>
+          <button class="button go" id="go" type="submit" disabled><span id="go-label">Search</span><svg class="icon"><use href="#arrow"/></svg></button>
+        </form>
+        <details id="session-menu" class="session-menu browser-only">
+          <summary aria-label="Session details and browser controls" title="Session details and browser controls"><svg class="icon session-clock"><use href="#clock"/></svg><span class="allowance"><b id="timer">30:00</b><span id="traffic">100 MiB</span></span><svg class="icon session-chevron"><use href="#chevron"/></svg><svg class="icon session-mobile-icon"><use href="#menu"/></svg></summary>
+          <div class="session-popover">
+            <span class="section-label">YOUR BROWSING SESSION</span>
+            <div class="popover-allowance"><span>Time left<strong id="menu-timer">30:00</strong></span><span>Data left<strong id="menu-traffic">100 MiB</strong></span></div>
+            <p id="status" role="status">Ready to explore</p>
+            <p class="session-help">Daily allowance: 30 minutes / 100 MiB.<br>Ending a session does not reset it.</p>
+            <div class="mobile-browser-actions">
+              <button type="button" data-browser-action="back"><svg class="icon reverse"><use href="#arrow"/></svg>Back</button>
+              <button type="button" data-browser-action="forward"><svg class="icon"><use href="#arrow"/></svg>Forward</button>
+              <button type="button" data-browser-action="reload"><svg class="icon"><use href="#refresh"/></svg>Reload</button>
+              <button type="button" data-browser-action="stop"><svg class="icon"><use href="#logout"/></svg>End session</button>
+            </div>
+          </div>
+        </details>
+        <button id="stop" class="end-session browser-only" type="button"><svg class="icon"><use href="#logout"/></svg><span>End session</span></button>
+      </div>
+      <section id="country-showcase" class="country-showcase landing-only" aria-label="Available proxy locations">
+        <div id="country-rows" class="country-rows">__COUNTRY_ROWS__</div>
+      </section>
+      <p id="notice" role="alert" hidden></p><button id="proxy-retry" class="text-button" type="button" hidden>Try again</button>
+      <div id="viewport" class="browser-only">
+        <div id="page-loading" class="page-loading" role="status" hidden>
+          <div class="brand loading-brand" aria-label="IP Info by Shifter">__IP_INFO_BRAND__</div>
+          <p aria-hidden="true">Loading<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span></p>
+          <span class="sr-only">Loading your website. Please wait.</span>
+        </div>
+        <div id="empty" class="viewport-message"><svg class="icon"><use href="#globe"/></svg><h2>Preparing your destination</h2><p>Your website will appear here.</p></div>
+        <div id="runtime-host" hidden></div>
+        <div id="expired" class="viewport-message" hidden><svg class="icon"><use href="#globe"/></svg><h2>Your free browsing window has ended.</h2><p>You’ve reached today’s time or data allowance.<br>Come back tomorrow, or explore more with Shifter.</p><a class="button" href="https://shifter.io/services/residential-proxies">Explore Shifter <svg class="icon"><use href="#arrow"/></svg></a><button id="expired-home" class="text-button">Back to the web proxy</button></div>
+      </div>
+    </section>
+    <div class="hero-bottom landing-only"><button id="resume" class="button secondary" hidden>Return to your browsing session <svg class="icon"><use href="#arrow"/></svg></button><ul class="benefits"><li><svg class="icon"><use href="#check"/></svg> Free to use</li><li><svg class="icon"><use href="#check"/></svg> <span id="country-count">__COUNTRY_COUNT__</span> countries</li><li><svg class="icon"><use href="#check"/></svg> Powered by Shifter</li></ul><a class="how-link" href="#how-it-works">How does it work? <svg class="icon"><use href="#chevron"/></svg></a></div>
+  </section>
+  <div class="landing-only content">
+    <!-- Shifter SectionHeader + ProductFeaturesSection; only the copy and icons vary. -->
+    <section id="how-it-works" class="section steps-section" aria-labelledby="steps-title">
+      <div class="shifter-section-header">
+        <div class="shifter-heading-content" data-shifter-reveal="heading">
+          <span class="shifter-section-badge"><span aria-hidden="true"></span>GET STARTED</span>
+          <h2 id="steps-title">Your next destination.<br><span>Three simple steps.</span></h2>
+          <p>A new view of the web, right inside your browser.</p>
+        </div>
+      </div>
+      <div class="shifter-feature-grid" data-shifter-reveal="cards">
+        <article class="shifter-feature-card" style="--reveal-delay:0s">
+          <div class="shifter-feature-glow" aria-hidden="true"></div>
+          <div class="shifter-feature-content">
+            <div class="shifter-feature-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></svg></div>
+            <div><h3>Choose your country</h3><p>Pick where you want to browse from. Your website traffic will use a Shifter proxy in that location.</p></div>
+          </div>
+        </article>
+        <article class="shifter-feature-card" style="--reveal-delay:.06s">
+          <div class="shifter-feature-glow" aria-hidden="true"></div>
+          <div class="shifter-feature-content">
+            <div class="shifter-feature-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg></div>
+            <div><h3>Enter a website</h3><p>Paste a website address and press Search. Complete the quick check in the pop-up to start your free session.</p></div>
+          </div>
+        </article>
+        <article class="shifter-feature-card" style="--reveal-delay:.12s">
+          <div class="shifter-feature-glow" aria-hidden="true"></div>
+          <div class="shifter-feature-content">
+            <div class="shifter-feature-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div>
+            <div><h3>Make yourself at home</h3><p>Browse in a full-page view. Follow links, scroll naturally, or open another URL from the toolbar.</p></div>
+          </div>
+        </article>
+      </div>
+    </section>
+    <section class="section explainer orbit-section" aria-labelledby="what-title">
+      <div class="orbit-copy"><span class="section-label">A LOCAL VIEW. A GLOBAL NETWORK.</span><h2 id="what-title">One browser.<br>A world of perspectives.</h2><p>Explore websites from the United States, the UK, Canada, and beyond. Shifter’s free web proxy connects you through a residential proxy in your chosen country, so you can discover a different view of the web.</p><p>No downloads or browser setup. Just choose a location, enter a website, and start exploring.</p><a class="inline-link" href="#address">Find your next perspective <svg class="icon"><use href="#arrow"/></svg></a></div>
+      <figure class="orbit-visual">
+        <div id="country-orbits" class="country-orbits" role="img" aria-label="Country flags orbiting the Shifter logo">
+          <div id="orbit-rings" aria-hidden="true">__COUNTRY_ORBITS__</div>
+          <div class="orbit-core" aria-hidden="true"><img src="/assets/favicon.svg" alt="" width="48" height="58"></div>
+        </div>
+      </figure>
+    </section>
+    <section class="section faq" aria-labelledby="faq-title"><div class="section-heading"><span class="faq-badge"><span aria-hidden="true"></span>FAQ</span><h2 id="faq-title">Frequently asked <span>questions</span></h2><p>Answers to common questions about Shifter’s free web proxy. Choose your location and start exploring with confidence.</p></div><div class="faq-list">
+      <details name="proxy-faq" open><summary>How do I use Shifter’s free web proxy?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>Choose a country in the search widget, enter an HTTP or HTTPS website address, and select Search. Complete verification in the pop-up to continue. The page becomes a browser with Back, Forward, Reload, and an address bar. Select the IP Info by Shifter logo to return to this page or End session to stop browsing.</p></details>
+      <details name="proxy-faq"><summary>Is the web proxy free to use?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>Yes. The current free allowance is up to 30 minutes and 100 MiB of traffic per visitor, per day. Your remaining time and data appear in the browser toolbar. Ending a session or changing country does not reset your allowance.</p></details>
+      <details name="proxy-faq"><summary>What can I use an online web proxy for?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>Use it to preview a public website from another country, check how your own pages appear in a different location, or try browsing through a proxy without installing software. Availability and content can vary by website.</p></details>
+      <details name="proxy-faq"><summary>Is a web proxy the same as a VPN?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>No. This web proxy routes the website traffic inside this page. It does not cover your other browser tabs or applications. A VPN can route traffic from more of your device, depending on its configuration.</p></details>
+      <details name="proxy-faq"><summary>Will every website work?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>Some websites, video services, downloads, and sign-in flows may not work through a web proxy. Websites can also restrict proxy traffic. This tool does not guarantee anonymity; a website can still recognize information you provide or an account you sign into.</p></details>
+      <details name="proxy-faq"><summary>Can I change country while browsing?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>Yes. Choose another location from the toolbar. Changing country starts a fresh website session, so you may need to sign in again. Your daily time and data allowance stays the same.</p></details>
+    </div></section>
+    <section class="upgrade"><div><span class="section-label">GO FURTHER WITH SHIFTER</span><h2>A quick look today.<br>A world of possibilities tomorrow.</h2><p>Need proxies for your workflow? Explore the Shifter network.</p></div><a class="button" href="https://shifter.io/services/residential-proxies">Explore residential proxies <svg class="icon"><use href="#arrow"/></svg></a></section>
+  </div>
+</div>

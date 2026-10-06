@@ -5,6 +5,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
 from api_contract import FIELDS, EXAMPLE, openapi
+from text_checks import assert_clean_html
 ROOT=Path(__file__).resolve().parents[1]; WEB=ROOT/'web'
 class Page(HTMLParser):
     def __init__(self,text):
@@ -18,13 +19,32 @@ def main():
     known.update({'/json':None,'/healthz':None,'/readyz':None})
     titles=[];descs=[]
     for filename in [p.stem for p in sorted(WEB.glob('*.html'))]:
-        text=(WEB/(filename+'.html')).read_text(); page=Page(text)
+        text=(WEB/(filename+'.html')).read_text(encoding='utf-8'); page=Page(text)
+        assert_clean_html(text, filename)
+        assert '<meta charset="utf-8">' in text[:1024], (filename, 'early UTF-8 declaration')
         assert not re.search(r'__cp|cpLocation|\ufffd',text,re.I), (filename,'corrupted text')
         matches=re.findall(r'<title>(.*?)</title>',text);assert len(matches)==1
         title=html.unescape(matches[0]);assert title.strip();titles.append(title)
         desc=[a['content'] for t,a in page.tags if t=='meta' and a.get('name')=='description'];assert len(desc)==1;descs+=desc
         for key,expected in [('og:title',title),('twitter:title',title),('og:description',desc[0]),('twitter:description',desc[0])]:
             assert [a['content'] for t,a in page.tags if t=='meta' and (a.get('name')==key or a.get('property')==key)]==[expected],(filename,key)
+        def meta(key):
+            values=[a.get('content') for t,a in page.tags if t=='meta' and (a.get('name')==key or a.get('property')==key)]
+            assert len(values)==1 and values[0], (filename,key)
+            return values[0]
+        image=meta('og:image'); assert meta('twitter:image')==image
+        expected_image='home' if filename in ('index','404') else filename
+        assert image==f'https://ip-info.com/meta/{expected_image}.png', (filename,image)
+        image_bytes=(WEB/'meta'/f'{expected_image}.png').read_bytes()
+        assert image_bytes[:8]==b'\x89PNG\r\n\x1a\n'
+        assert struct.unpack('>II',image_bytes[16:24])==(1200,630), (filename,'social image dimensions')
+        assert (meta('og:image:width'),meta('og:image:height'))==('1200','630')
+        assert meta('og:image:type')=='image/png'
+        assert meta('og:image:alt')==title and meta('twitter:image:alt')==title
+        assert meta('twitter:card')=='summary_large_image'
+        canonical='https://ip-info.com'+('/' if filename=='index' else '/'+filename)
+        assert [a['href'] for t,a in page.tags if t=='link' and a.get('rel')=='canonical']==[canonical]
+        assert meta('og:url')==canonical
         icons=[a for t,a in page.tags if t=='link' and a.get('rel')=='icon']
         assert {a['href'] for a in icons}=={'/favicon.ico','/favicon.png','/favicon.svg'},filename
         assert any(a.get('sizes')=='96x96' and a.get('type')=='image/png' for a in icons),filename
@@ -43,7 +63,7 @@ def main():
                 if parts.fragment: assert f'id="{parts.fragment}"' in target.read_text(),(filename,href)
         assert '__EXAMPLES__' not in text and '__FAQ__' not in text
     assert len(titles)==len(set(titles));assert len(descs)==len(set(descs))
-    urls=ET.fromstring((WEB/'sitemap.xml').read_text());assert len(urls)==7
+    urls=ET.fromstring((WEB/'sitemap.xml').read_text());assert len(urls)==8
     docs=(WEB/'docs.html').read_text();full=(WEB/'llms-full.txt').read_text()
     for name,*_ in FIELDS: assert f'<dt>{name}<' in docs;assert f'- {name} (' in full
     assert (WEB/'share.png').read_bytes()[:8]==b'\x89PNG\r\n\x1a\n'

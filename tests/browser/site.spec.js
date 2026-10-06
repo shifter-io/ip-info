@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 test('every page keeps clean search metadata and loads crawlable icons',async({page,request})=>{
   const titles = new Set();
-  for (const route of ['/','/docs','/ai','/about','/terms','/privacy','/cookies','/missing/nested-page']) {
+  for (const route of ['/','/docs','/web-proxy','/ai','/about','/terms','/privacy','/cookies','/missing/nested-page']) {
     const response = await page.goto(route);
     expect(response.status()).toBe(route.startsWith('/missing') ? 404 : 200);
     expect(await response.text()).not.toMatch(/__cp|cpLocation|\uFFFD/i);

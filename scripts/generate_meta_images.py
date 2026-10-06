@@ -37,6 +37,7 @@ logo=logo.resize((166,45),Image.Resampling.LANCZOS)
 
 pages=[
 ('home','FREE IP INTELLIGENCE','Know the IP.','Build the next thing.','Free geolocation and ASN API.','No signup. No API key.','GET /json','200 OK'),
+('web-proxy','FREE WEB PROXY','A whole new','perspective.','Choose a country. Enter a website.','Free to use · Powered by Shifter','/web-proxy','EXPLORE THE WEB'),
 ('docs','DOCUMENTATION','One request.','All the details.','IP location, ISP and ASN in clean JSON.','IPv4 + IPv6 · Examples in 9 languages','GET /json?ip=8.8.8.8','30 FIELDS'),
 ('ai','BUILT FOR AI AGENTS','IP intelligence.','Ready for your agent.','Ordinary HTTP. Structured JSON.','OpenAPI · llms.txt · No authentication','/llms.txt','AGENT READY'),
 ('about','ABOUT IP INFO','Free, on us.','Built by Shifter.','Premium IP intelligence. Zero subscription cost.','Maintained and supported by Shifter.','IP Info + Shifter','OUR STORY'),
@@ -66,5 +67,5 @@ for slug,tag,line1,line2,desc,note,endpoint,badge in pages:
     im.save(OUT/f'{slug}.png',optimize=True)
 (ROOT/'web/share.png').write_bytes((OUT/'home.png').read_bytes())
 items=''.join(f'<article><h2>{html.escape(p[1].title())}</h2><img alt="{html.escape(p[2]+" "+p[3])}" src="data:image/png;base64,{base64.b64encode((OUT/(p[0]+".png")).read_bytes()).decode()}"></article>' for p in pages)
-(ROOT/'docs/meta-images.html').write_text('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IP Info — Social preview images</title><style>body{background:#0b0e17;color:#fafafa;font:16px system-ui;margin:40px auto;padding:0 24px;max-width:1300px}h1{font-size:36px}p{color:#9ba5b5}main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}h2{font-size:17px;font-weight:500}img{width:100%;border-radius:12px}@media(max-width:750px){main{grid-template-columns:1fr}}</style><h1>IP Info. Ready to share.</h1><p>Seven page-specific previews · 1200 × 630 · Shifter branding</p><main>'+items+'</main></html>')
-print('Created seven social images and standalone review gallery.')
+(ROOT/'docs/meta-images.html').write_text('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IP Info — Social preview images</title><style>body{background:#0b0e17;color:#fafafa;font:16px system-ui;margin:40px auto;padding:0 24px;max-width:1300px}h1{font-size:36px}p{color:#9ba5b5}main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}h2{font-size:17px;font-weight:500}img{width:100%;border-radius:12px}@media(max-width:750px){main{grid-template-columns:1fr}}</style><h1>IP Info. Ready to share.</h1><p>Eight page-specific previews · 1200 × 630 · Shifter branding</p><main>'+items+'</main></html>')
+print('Created eight social images and standalone review gallery.')
