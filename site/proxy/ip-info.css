@@ -4,7 +4,7 @@
 /* Match the approved form; do not inherit IP lookup label/input spacing. */
 #web-proxy .url-label { margin:0; font-size:inherit; }
 #web-proxy #address, #web-proxy #country-search { padding:1px 2px; }
-#web-proxy .hero { padding-top:165px; background:transparent; }
+#web-proxy .hero { padding-top:165px; background:transparent; overflow:visible; }
 #web-proxy .eyebrow { text-transform:none; letter-spacing:normal; }
 #web-proxy a:hover { text-decoration:none; }
 #web-proxy .hero h1 { max-width:none; }
