@@ -17,7 +17,6 @@ function browserMode(on) {
   $('session-menu').open = false;
   $('browser').setAttribute('aria-label', on ? 'Web proxy browser' : 'Start browsing');
   $('resume').hidden = !current.active || on;
-  $('go-label').textContent = on ? 'Go' : 'Search';
   $('address').placeholder = on ? 'Website URL' : 'Enter a website URL';
   if (!on) { window.scrollTo(0, landingScroll); $('address').focus({preventScroll:true}); }
   else $('browser').focus({preventScroll:true});

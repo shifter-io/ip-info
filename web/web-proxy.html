@@ -1388,6 +1388,7 @@ body.is-browsing #web-proxy #country-trigger{ height: 38px; padding: 0 10px; fon
 body.is-browsing #web-proxy .country-label{ width:150px; }
 #web-proxy .session-menu #traffic{ display:none; }}
 @media(max-width:1000px){body.is-browsing #web-proxy .country-label{ width:56px; }
+body.is-browsing #web-proxy .url-label > .icon{ display:none; }
 body.is-browsing #web-proxy #country-name{ position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 body.is-browsing #web-proxy #country-trigger{ justify-content:center; gap:4px; padding:0 6px; }
 body.is-browsing #web-proxy .country-popup{ left:0; right:auto; }
@@ -1405,8 +1406,7 @@ body.is-browsing #web-proxy .url-label input{ font-size:16px; }
 body.is-browsing #web-proxy .url-label > .icon{ display:none; }
 body.is-browsing #web-proxy .country-label{ width:48px; }
 body.is-browsing #web-proxy .country-popup{ left:-40px; right:auto; width:min(300px, calc(100vw - 20px)); }
-body.is-browsing #web-proxy .go{ min-width:38px; width:38px; padding:0; }
-body.is-browsing #web-proxy #go-label{ position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+body.is-browsing #web-proxy .go{ min-width:100px; width:auto; padding:0 13px; }
 #web-proxy .session-menu summary{ width:36px; padding:0; justify-content:center; }
 #web-proxy .session-menu summary .session-clock,#web-proxy .session-menu summary .session-chevron{ display:none; }
 #web-proxy .session-menu .session-mobile-icon{ display:block; width:20px; height:20px; }
@@ -1934,7 +1934,6 @@ function browserMode(on) {
   $('session-menu').open = false;
   $('browser').setAttribute('aria-label', on ? 'Web proxy browser' : 'Start browsing');
   $('resume').hidden = !current.active || on;
-  $('go-label').textContent = on ? 'Go' : 'Search';
   $('address').placeholder = on ? 'Website URL' : 'Enter a website URL';
   if (!on) { window.scrollTo(0, landingScroll); $('address').focus({preventScroll:true}); }
   else $('browser').focus({preventScroll:true});
