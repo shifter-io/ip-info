@@ -12,7 +12,9 @@ async function main() {
     const page = await browser.newPage();
     const svg = fs.readFileSync(path.join(web, 'favicon.svg'), 'utf8');
     const frames = [];
-    for (const size of [16, 32, 48, 96]) {
+    const outputs = {96: 'favicon.png', 180: 'apple-touch-icon.png',
+      192: 'android-chrome-192x192.png', 512: 'android-chrome-512x512.png'};
+    for (const size of [16, 32, 48, 96, 180, 192, 512]) {
       const data = await page.evaluate(async ({svg, size}) => {
         const image = new Image();
         // Explicit dimensions let browsers rasterize a viewBox-only SVG into a canvas.
@@ -20,11 +22,17 @@ async function main() {
         await image.decode();
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = size;
-        canvas.getContext('2d').drawImage(image, 0, 0, size, size);
+        const context = canvas.getContext('2d');
+        // Home-screen icons need an opaque background; the OS applies its own mask.
+        if (size >= 180) {
+          context.fillStyle = '#0b1426';
+          context.fillRect(0, 0, size, size);
+        }
+        context.drawImage(image, 0, 0, size, size);
         return canvas.toDataURL('image/png').split(',')[1];
       }, {svg, size});
       const png = Buffer.from(data, 'base64');
-      if (size === 96) fs.writeFileSync(path.join(web, 'favicon.png'), png);
+      if (outputs[size]) fs.writeFileSync(path.join(web, outputs[size]), png);
       else frames.push({size, png});
     }
     // ICO directory followed by PNG-compressed frames, supported by modern browsers.
@@ -42,7 +50,7 @@ async function main() {
       offset += png.length;
     });
     fs.writeFileSync(path.join(web, 'favicon.ico'), Buffer.concat([directory, ...frames.map(f => f.png)]));
-    console.log('Generated favicon.png (96×96) and favicon.ico (16/32/48) from favicon.svg.');
+    console.log('Generated favicon PNG/ICO, Apple touch icon (180×180), and Android icons (192×192/512×512) from favicon.svg.');
   } finally {
     await browser.close();
   }

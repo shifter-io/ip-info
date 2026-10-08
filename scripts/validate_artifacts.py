@@ -48,6 +48,9 @@ def main():
         icons=[a for t,a in page.tags if t=='link' and a.get('rel')=='icon']
         assert {a['href'] for a in icons}=={'/favicon.ico','/favicon.png','/favicon.svg'},filename
         assert any(a.get('sizes')=='96x96' and a.get('type')=='image/png' for a in icons),filename
+        assert [a for t,a in page.tags if t=='link' and a.get('rel')=='apple-touch-icon']==[
+            {'rel':'apple-touch-icon','href':'/apple-touch-icon.png','sizes':'180x180'}],filename
+        assert [a.get('href') for t,a in page.tags if t=='link' and a.get('rel')=='manifest']==['/site.webmanifest'],filename
         assert sum(1 for t,_ in page.tags if t=='h1')==1
         assert [a for t,a in page.tags if t=='link' and a.get('rel')=='canonical']
         json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>',text,re.S).group(1))
@@ -69,6 +72,15 @@ def main():
     assert (WEB/'share.png').read_bytes()[:8]==b'\x89PNG\r\n\x1a\n'
     png=(WEB/'favicon.png').read_bytes()
     assert png[:8]==b'\x89PNG\r\n\x1a\n' and struct.unpack('>II',png[16:24])==(96,96)
+    manifest=json.loads((WEB/'site.webmanifest').read_text())
+    assert manifest['name']==manifest['short_name']=='IP Info'
+    assert manifest['start_url']==manifest['scope']==manifest['id']=='/'
+    assert {icon['sizes'] for icon in manifest['icons']}=={'192x192','512x512'}
+    for icon in [*manifest['icons'], {'src':'/apple-touch-icon.png','sizes':'180x180','type':'image/png'}]:
+        assert icon['type']=='image/png' and icon['src'].startswith('/')
+        png=(WEB/icon['src'].lstrip('/')).read_bytes()
+        assert png[:8]==b'\x89PNG\r\n\x1a\n'
+        assert struct.unpack('>II',png[16:24])==tuple(map(int,icon['sizes'].split('x')))
     ico=(WEB/'favicon.ico').read_bytes();assert struct.unpack('<HHH',ico[:6])==(0,1,3)
     for i,size in enumerate([16,32,48]):
         width,height,_,_,planes,depth,length,offset=struct.unpack_from('<BBBBHHII',ico,6+i*16)

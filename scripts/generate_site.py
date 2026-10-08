@@ -52,7 +52,9 @@ def document(path, title, desc, body, extra=''):
     icons = (f'<link rel="icon" href="data:image/svg+xml,{quote(ICON)}">' if path == '/operations' else
              '<link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16 32x32 48x48">'
              '<link rel="icon" href="/favicon.png" type="image/png" sizes="96x96">'
-             '<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">')
+             '<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">'
+             '<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">'
+             '<link rel="manifest" href="/site.webmanifest">')
     structured={'@context':'https://schema.org','@graph':[{'@type':'Organization','@id':'https://shifter.io/#organization','name':'Shifter','url':'https://shifter.io'}, {'@type':'WebSite','@id':'https://ip-info.com/#website','name':'IP Info','url':'https://ip-info.com/','publisher':{'@id':'https://shifter.io/#organization'}}, {'@type':'WebApplication','name':'IP Info','url':'https://ip-info.com/','applicationCategory':'DeveloperApplication','operatingSystem':'Any','isAccessibleForFree':True,'offers':{'@type':'Offer','price':'0','priceCurrency':'USD'},'publisher':{'@id':'https://shifter.io/#organization'}}]}
     if path == '/web-proxy':
         structured['@graph'][-1].update(name='IP Info Web Proxy', url='https://ip-info.com/web-proxy', description=desc, image='https://ip-info.com/meta/web-proxy.png', applicationCategory='UtilitiesApplication')
@@ -109,6 +111,14 @@ def main():
     (ROOT/'tests/example.json').write_text(json.dumps(EXAMPLE,indent=2)+'\n')
     (WEB/'openapi.json').write_text(json.dumps(openapi(),indent=2)+'\n')
     (WEB/'favicon.svg').write_text(ICON)
+    (WEB/'site.webmanifest').write_text(json.dumps({
+        'name': 'IP Info', 'short_name': 'IP Info', 'id': '/',
+        'start_url': '/', 'scope': '/', 'display': 'standalone',
+        'theme_color': '#080c16', 'background_color': '#080c16',
+        'icons': [{'src': f'/android-chrome-{size}x{size}.png',
+                   'sizes': f'{size}x{size}', 'type': 'image/png', 'purpose': 'any'}
+                  for size in (192, 512)],
+    }, indent=2)+'\n')
     content={}
     content['/']=(ROOT/'site/home.html').read_text().replace('__SHIFTER_LOGO__',LOGO).replace('__EXAMPLES__',examples_widget()).replace('__FAQ__',''.join(f'<details><summary>{q}</summary><p>{a}</p></details>' for q,a in FAQ))
     sample=code(json.dumps(EXAMPLE,indent=2),'full-response')

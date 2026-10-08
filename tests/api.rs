@@ -85,6 +85,26 @@ async fn production_favicons_are_crawlable_without_a_database() {
             "image/svg+xml",
             &include_bytes!("../web/favicon.svg")[..],
         ),
+        (
+            "/apple-touch-icon.png",
+            "image/png",
+            &include_bytes!("../web/apple-touch-icon.png")[..],
+        ),
+        (
+            "/android-chrome-192x192.png",
+            "image/png",
+            &include_bytes!("../web/android-chrome-192x192.png")[..],
+        ),
+        (
+            "/android-chrome-512x512.png",
+            "image/png",
+            &include_bytes!("../web/android-chrome-512x512.png")[..],
+        ),
+        (
+            "/site.webmanifest",
+            "application/manifest+json",
+            &include_bytes!("../web/site.webmanifest")[..],
+        ),
     ] {
         let (status, headers, body) = call_raw(router.clone(), path, "GET", &[]).await;
         assert_eq!(status, StatusCode::OK, "{path}");

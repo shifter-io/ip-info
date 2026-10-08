@@ -340,6 +340,42 @@ pub fn app(state: Arc<AppState>) -> Router {
             }),
         )
         .route(
+            "/apple-touch-icon.png",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "image/png")],
+                    &include_bytes!("../web/apple-touch-icon.png")[..],
+                )
+            }),
+        )
+        .route(
+            "/android-chrome-192x192.png",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "image/png")],
+                    &include_bytes!("../web/android-chrome-192x192.png")[..],
+                )
+            }),
+        )
+        .route(
+            "/android-chrome-512x512.png",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "image/png")],
+                    &include_bytes!("../web/android-chrome-512x512.png")[..],
+                )
+            }),
+        )
+        .route(
+            "/site.webmanifest",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "application/manifest+json")],
+                    &include_bytes!("../web/site.webmanifest")[..],
+                )
+            }),
+        )
+        .route(
             "/healthz",
             get(|| async { pretty_json(json!({"status":"ok"})) })
                 .layer(middleware::from_fn(api_headers)),
