@@ -31,3 +31,20 @@ pub struct LookupResponse {
     pub user_type: Option<String>,
     pub is_anycast: Option<bool>,
 }
+#[derive(Debug, serde::Serialize)]
+pub struct LookupLiteResponse {
+    pub country_code: Option<String>,
+    pub region: Option<String>,
+    pub city: Option<String>,
+    pub timezone: Option<String>,
+}
+impl From<LookupResponse> for LookupLiteResponse {
+    fn from(record: LookupResponse) -> Self {
+        Self {
+            country_code: record.country,
+            region: record.region,
+            city: record.city,
+            timezone: record.timezone,
+        }
+    }
+}

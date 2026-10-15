@@ -151,10 +151,10 @@
   const examples = $('#examples-data') ? JSON.parse($('#examples-data').textContent) : null;
   function renderExample() {
     if (!examples) return;
-    const lang=$('#example-language').value, mode=$('#example-mode').value, protocol=$('#example-protocol').value;
+    const lang=$('#example-language').value, mode=$('#example-mode').value+($('#example-format').value==='json_lite'?'_lite':''), protocol=$('#example-protocol').value;
     $('#example-code').textContent=examples[lang][mode].replaceAll('https://ip-info.com',protocol+'://ip-info.com');
   }
-  for (const id of ['example-language','example-mode','example-protocol']) $('#'+id)?.addEventListener('change',()=>{renderExample();if(id==='example-language')event('language_select',{language:$('#example-language').value});});
+  for (const id of ['example-language','example-mode','example-format','example-protocol']) $('#'+id)?.addEventListener('change',()=>{renderExample();if(id==='example-language')event('language_select',{language:$('#example-language').value});});
   const languageTabs = $('.language-tabs');
   if (languageTabs) {
     languageTabs.hidden = false;
@@ -167,21 +167,22 @@
     }));
   }
   // Custom menus keep native selects as the value source and no-JS fallback.
-  for (const id of ['example-mode','example-protocol']) {
+  for (const id of ['example-mode','example-format','example-protocol']) {
     const select = $('#'+id); if (!select) continue;
     const label = select.closest('label');
     const wrapper = document.createElement('div'); wrapper.className='custom-select';
     const trigger = document.createElement('button'); trigger.type='button'; trigger.className='select-trigger';
     trigger.setAttribute('aria-haspopup','listbox'); trigger.setAttribute('aria-expanded','false');
     const menu = document.createElement('div'); menu.className='select-menu'; menu.id=id+'-menu'; menu.hidden=true;
-    menu.setAttribute('role','listbox'); menu.setAttribute('aria-label',id==='example-mode'?'Lookup mode':'Protocol');
+    const controlLabel = {'example-mode':'Lookup','example-format':'Response','example-protocol':'Protocol'}[id];
+    menu.setAttribute('role','listbox'); menu.setAttribute('aria-label',controlLabel);
     trigger.setAttribute('aria-controls',menu.id);
     const options = [...select.options].map(option=>{
       const button=document.createElement('button'); button.type='button'; button.setAttribute('role','option'); button.textContent=option.textContent;
       button.addEventListener('click',()=>{select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));sync();close();trigger.focus();});
       menu.append(button); return button;
     });
-    function sync(){trigger.textContent=select.selectedOptions[0].textContent;trigger.setAttribute('aria-label',(id==='example-mode'?'Lookup: ':'Protocol: ')+trigger.textContent);options.forEach((button,index)=>button.setAttribute('aria-selected',String(select.options[index].selected)));}
+    function sync(){trigger.textContent=select.selectedOptions[0].textContent;trigger.setAttribute('aria-label',controlLabel+': '+trigger.textContent);options.forEach((button,index)=>button.setAttribute('aria-selected',String(select.options[index].selected)));}
     function close(){menu.hidden=true;trigger.setAttribute('aria-expanded','false');}
     function open(){menu.hidden=false;trigger.setAttribute('aria-expanded','true');options[select.selectedIndex].focus();}
     trigger.addEventListener('click',()=>menu.hidden?open():close());

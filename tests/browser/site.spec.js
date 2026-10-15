@@ -87,6 +87,32 @@ test('mobile layout, keyboard and visual captures',async({page},testInfo)=>{
   await page.keyboard.press('Enter');
   await page.screenshot({path:testInfo.outputPath('docs-mobile.png'),fullPage:true});
 });
+test('lite examples work on the homepage and docs in every language',async({page})=>{
+  for (const route of ['/','/docs']) {
+    await page.goto(route);
+    await page.locator('button[aria-controls="example-format-menu"]').click();
+    await page.locator('#example-format-menu').getByRole('option',{name:'Lite JSON',exact:true}).click();
+    for (const language of ['cURL','Node.js','Python','PHP','Go','Rust','Java','C#','Ruby']) {
+      await page.getByRole('button',{name:language,exact:true}).click();
+      await expect(page.locator('#example-code')).toContainText('https://ip-info.com/json_lite');
+      await expect(page.locator('#example-code')).not.toContainText('?ip=');
+    }
+    await page.locator('button[aria-controls="example-mode-menu"]').click();
+    await page.locator('#example-mode-menu').getByRole('option',{name:'Specific IP',exact:true}).click();
+    await page.locator('button[aria-controls="example-protocol-menu"]').click();
+    await page.locator('#example-protocol-menu').getByRole('option',{name:'HTTP',exact:true}).click();
+    await expect(page.locator('#example-code')).toContainText('http://ip-info.com/json_lite?ip=8.8.8.8');
+    await page.locator('button[aria-controls="example-format-menu"]').click();
+    await page.locator('#example-format-menu').getByRole('option',{name:'Full JSON',exact:true}).click();
+    await expect(page.locator('#example-code')).toContainText('http://ip-info.com/json?ip=8.8.8.8');
+    await expect(page.locator('#example-code')).not.toContainText('/json_lite');
+  }
+  const sample=JSON.parse(await page.locator('#lite-response').textContent());
+  expect(Object.keys(sample)).toEqual(['country_code','region','city','timezone']);
+  const response=await page.request.get('/json_lite?ip=8.8.8.8');
+  expect(response.status()).toBe(200);
+  expect(Object.keys(await response.json())).toEqual(Object.keys(sample));
+});
 test('content and all examples work without JavaScript',async({browser,baseURL})=>{
   const context=await browser.newContext({javaScriptEnabled:false,baseURL});
   const page=await context.newPage();
@@ -95,6 +121,8 @@ test('content and all examples work without JavaScript',async({browser,baseURL})
   const examples=page.locator('.example-static'); await expect(examples).toHaveCount(9);
   await examples.nth(2).locator('summary').click();
   await expect(examples.nth(2).locator('pre').first()).toContainText('https://ip-info.com/json');
+  await expect(examples.nth(2).locator('pre').nth(2)).toContainText('https://ip-info.com/json_lite');
+  await expect(examples.nth(2).locator('pre').nth(3)).toContainText('https://ip-info.com/json_lite?ip=8.8.8.8');
   await page.goto('/');
   await page.locator('#ip-input').fill('8.8.8.8');await page.locator('#ip-input').press('Enter');
   await expect(page.locator('body')).toContainText('Mountain View');

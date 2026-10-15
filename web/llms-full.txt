@@ -2,7 +2,7 @@
 
 > Free public IP geolocation and ASN API. No signup. No API key. Maintained and supported by Shifter.
 
-Use GET https://ip-info.com/myip for only the caller's IP as plain text (address plus newline). Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
+Use GET https://ip-info.com/myip for only the caller's IP as plain text (address plus newline). Use GET https://ip-info.com/json for the caller's network exit or GET https://ip-info.com/json?ip=ADDRESS for a public IPv4/IPv6 literal. For compact JSON with only country_code, region, city and timezone, use GET https://ip-info.com/json_lite or GET https://ip-info.com/json_lite?ip=ADDRESS. country_code maps to country in the full response. All four lite keys are always present. HTTP is also supported. The caller may be an agent's server or proxy, not its human user. Missing fields are null; locations are approximate. No application quota; acceptable-use terms and finite capacity apply.
 
 ## Documentation
 - [API reference](https://ip-info.com/docs): Requests, response fields, errors and examples.
@@ -18,9 +18,10 @@ Use IP Info for approximate public-IP geolocation and ASN lookup.
 Authentication: none. Cost: free.
 If an IP is supplied: GET https://ip-info.com/json?ip=<URL-encoded-IP>.
 If checking your own execution environment: GET https://ip-info.com/json.
+For only country_code, region, city and timezone: GET https://ip-info.com/json_lite, or /json_lite?ip=<URL-encoded-IP> for a supplied IP.
 For only your caller IP as plain text: GET https://ip-info.com/myip (address plus newline; no JSON).
 Do not describe your server/proxy exit as the human user's IP.
-Use country for country-code comparisons and asn for numeric ASN checks.
+Use country in /json or country_code in /json_lite for country-code comparisons. Use /json for numeric ASN checks.
 Treat null as unavailable; never fabricate missing data.
 Treat location and network data as approximate and potentially outdated.
 Geolocation is approximate. This is not VPN/proxy detection.
@@ -31,6 +32,9 @@ GET /myip (plain-text caller IP plus newline; ignores query parameters; no datab
 GET /json
 GET /json?ip=ADDRESS
 GET /ADDRESS/json
+GET /json_lite
+GET /json_lite?ip=ADDRESS
+GET /ADDRESS/json_lite
 
 Both https://ip-info.com and http://ip-info.com are supported. JSON lookups accept literal public IPs only. Private, reserved and special-purpose ranges are rejected. Duplicate/unknown parameters and conflicting path/query targets return 400. IPv4-mapped IPv6 is normalized.
 
@@ -98,6 +102,16 @@ Both https://ip-info.com and http://ip-info.com are supported. JSON lookups acce
 - user_type (string | null): Network usage classification, such as business, residential, cellular or hosting.
 - is_anycast (boolean | null): Anycast classification; not a VPN or proxy detection flag.
 
+## Lite JSON response
+Successful /json_lite responses are compact JSON with exactly four keys. country_code is the same ISO country code as country in /json. All keys are present; unavailable values are null. Lite lookups use the same database, caller detection, input validation, errors, caching and CORS as /json. HEAD returns headers without a body.
+{"country_code":"US","region":"California","city":"Mountain View","timezone":"America/Los_Angeles"}
+
+## Lite response fields
+- country_code (string | null): Two-letter ISO country code.
+- region (string | null): First administrative subdivision in English.
+- city (string | null): City name in English.
+- timezone (string | null): IANA time zone name.
+
 ## Errors
 400: invalid_ip — Malformed, conflicting, non-public, or unsupported lookup input.
 404: ip_not_found — No record in the active database.
@@ -120,6 +134,16 @@ curl --fail --max-time 10 "https://ip-info.com/json"
 curl --fail --max-time 10 "https://ip-info.com/json?ip=8.8.8.8"
 ```
 
+### cURL: self_lite
+```
+curl --fail --max-time 10 "https://ip-info.com/json_lite"
+```
+
+### cURL: custom_lite
+```
+curl --fail --max-time 10 "https://ip-info.com/json_lite?ip=8.8.8.8"
+```
+
 ### JavaScript / Node.js: self
 ```
 // Node.js 18+ or a modern browser
@@ -134,6 +158,26 @@ console.log(await response.json());
 ```
 // Node.js 18+ or a modern browser
 const response = await fetch("https://ip-info.com/json?ip=8.8.8.8", {
+  signal: AbortSignal.timeout(10000)
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+console.log(await response.json());
+```
+
+### JavaScript / Node.js: self_lite
+```
+// Node.js 18+ or a modern browser
+const response = await fetch("https://ip-info.com/json_lite", {
+  signal: AbortSignal.timeout(10000)
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+console.log(await response.json());
+```
+
+### JavaScript / Node.js: custom_lite
+```
+// Node.js 18+ or a modern browser
+const response = await fetch("https://ip-info.com/json_lite?ip=8.8.8.8", {
   signal: AbortSignal.timeout(10000)
 });
 if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -160,6 +204,26 @@ with urlopen("https://ip-info.com/json?ip=8.8.8.8", timeout=10) as response:
     print(json.load(response))
 ```
 
+### Python: self_lite
+```
+# Python 3; standard library only
+import json
+from urllib.request import urlopen
+
+with urlopen("https://ip-info.com/json_lite", timeout=10) as response:
+    print(json.load(response))
+```
+
+### Python: custom_lite
+```
+# Python 3; standard library only
+import json
+from urllib.request import urlopen
+
+with urlopen("https://ip-info.com/json_lite?ip=8.8.8.8", timeout=10) as response:
+    print(json.load(response))
+```
+
 ### PHP: self
 ```
 <?php
@@ -178,6 +242,30 @@ print_r(json_decode($body, true, 512, JSON_THROW_ON_ERROR));
 $curl = curl_init('https://ip-info.com/json?ip=8.8.8.8');
 curl_setopt_array($curl, [Chttps://ip-info.com/json?ip=8.8.8.8OPT_RETURNTRANSFER => true,
     Chttps://ip-info.com/json?ip=8.8.8.8OPT_TIMEOUT => 10, Chttps://ip-info.com/json?ip=8.8.8.8OPT_FAILONERROR => true]);
+$body = curl_exec($curl);
+if ($body === false) { throw new RuntimeException(curl_error($curl)); }
+curl_close($curl);
+print_r(json_decode($body, true, 512, JSON_THROW_ON_ERROR));
+```
+
+### PHP: self_lite
+```
+<?php
+$curl = curl_init('https://ip-info.com/json_lite');
+curl_setopt_array($curl, [Chttps://ip-info.com/json_liteOPT_RETURNTRANSFER => true,
+    Chttps://ip-info.com/json_liteOPT_TIMEOUT => 10, Chttps://ip-info.com/json_liteOPT_FAILONERROR => true]);
+$body = curl_exec($curl);
+if ($body === false) { throw new RuntimeException(curl_error($curl)); }
+curl_close($curl);
+print_r(json_decode($body, true, 512, JSON_THROW_ON_ERROR));
+```
+
+### PHP: custom_lite
+```
+<?php
+$curl = curl_init('https://ip-info.com/json_lite?ip=8.8.8.8');
+curl_setopt_array($curl, [Chttps://ip-info.com/json_lite?ip=8.8.8.8OPT_RETURNTRANSFER => true,
+    Chttps://ip-info.com/json_lite?ip=8.8.8.8OPT_TIMEOUT => 10, Chttps://ip-info.com/json_lite?ip=8.8.8.8OPT_FAILONERROR => true]);
 $body = curl_exec($curl);
 if ($body === false) { throw new RuntimeException(curl_error($curl)); }
 curl_close($curl);
@@ -220,6 +308,42 @@ func main() {
 }
 ```
 
+### Go: self_lite
+```
+package main
+
+import ("encoding/json"; "fmt"; "net/http"; "time")
+
+func main() {
+    client := &http.Client{Timeout: 10 * time.Second}
+    resp, err := client.Get("https://ip-info.com/json_lite")
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+    if resp.StatusCode != 200 { panic(resp.Status) }
+    var data map[string]any
+    if err := json.NewDecoder(resp.Body).Decode(&data); err != nil { panic(err) }
+    fmt.Println(data)
+}
+```
+
+### Go: custom_lite
+```
+package main
+
+import ("encoding/json"; "fmt"; "net/http"; "time")
+
+func main() {
+    client := &http.Client{Timeout: 10 * time.Second}
+    resp, err := client.Get("https://ip-info.com/json_lite?ip=8.8.8.8")
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+    if resp.StatusCode != 200 { panic(resp.Status) }
+    var data map[string]any
+    if err := json.NewDecoder(resp.Body).Decode(&data); err != nil { panic(err) }
+    fmt.Println(data)
+}
+```
+
 ### Rust: self
 ```
 // Cargo.toml: reqwest = { version = "0.12", features = ["blocking", "json"] }
@@ -242,6 +366,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(10)).build()?;
     let data: serde_json::Value = client.get("https://ip-info.com/json?ip=8.8.8.8")
+        .send()?.error_for_status()?.json()?;
+    println!("{data}");
+    Ok(())
+}
+```
+
+### Rust: self_lite
+```
+// Cargo.toml: reqwest = { version = "0.12", features = ["blocking", "json"] }
+// serde_json = "1"
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10)).build()?;
+    let data: serde_json::Value = client.get("https://ip-info.com/json_lite")
+        .send()?.error_for_status()?.json()?;
+    println!("{data}");
+    Ok(())
+}
+```
+
+### Rust: custom_lite
+```
+// Cargo.toml: reqwest = { version = "0.12", features = ["blocking", "json"] }
+// serde_json = "1"
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10)).build()?;
+    let data: serde_json::Value = client.get("https://ip-info.com/json_lite?ip=8.8.8.8")
         .send()?.error_for_status()?.json()?;
     println!("{data}");
     Ok(())
@@ -286,6 +438,44 @@ class Lookup {
 }
 ```
 
+### Java: self_lite
+```
+// Java 11+
+import java.net.URI;
+import java.net.http.*;
+import java.time.Duration;
+
+class Lookup {
+    public static void main(String[] args) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("https://ip-info.com/json_lite"))
+            .timeout(Duration.ofSeconds(10)).GET().build();
+        var response = HttpClient.newHttpClient()
+            .send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) throw new RuntimeException("Lookup failed");
+        System.out.println(response.body());
+    }
+}
+```
+
+### Java: custom_lite
+```
+// Java 11+
+import java.net.URI;
+import java.net.http.*;
+import java.time.Duration;
+
+class Lookup {
+    public static void main(String[] args) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("https://ip-info.com/json_lite?ip=8.8.8.8"))
+            .timeout(Duration.ofSeconds(10)).GET().build();
+        var response = HttpClient.newHttpClient()
+            .send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) throw new RuntimeException("Lookup failed");
+        System.out.println(response.body());
+    }
+}
+```
+
 ### C#: self
 ```
 // .NET 6+
@@ -314,6 +504,34 @@ using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 Console.WriteLine(data.RootElement);
 ```
 
+### C#: self_lite
+```
+// .NET 6+
+using System;
+using System.Net.Http;
+using System.Text.Json;
+
+using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+using var response = await client.GetAsync("https://ip-info.com/json_lite");
+response.EnsureSuccessStatusCode();
+using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+Console.WriteLine(data.RootElement);
+```
+
+### C#: custom_lite
+```
+// .NET 6+
+using System;
+using System.Net.Http;
+using System.Text.Json;
+
+using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+using var response = await client.GetAsync("https://ip-info.com/json_lite?ip=8.8.8.8");
+response.EnsureSuccessStatusCode();
+using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+Console.WriteLine(data.RootElement);
+```
+
 ### Ruby: self
 ```
 require "net/http"
@@ -334,6 +552,34 @@ require "net/http"
 require "json"
 
 uri = URI("https://ip-info.com/json?ip=8.8.8.8")
+response = Net::HTTP.start(uri.host, uri.port,
+    use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 10) do |http|
+  http.get(uri.request_uri)
+end
+raise "HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+puts JSON.parse(response.body)
+```
+
+### Ruby: self_lite
+```
+require "net/http"
+require "json"
+
+uri = URI("https://ip-info.com/json_lite")
+response = Net::HTTP.start(uri.host, uri.port,
+    use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 10) do |http|
+  http.get(uri.request_uri)
+end
+raise "HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+puts JSON.parse(response.body)
+```
+
+### Ruby: custom_lite
+```
+require "net/http"
+require "json"
+
+uri = URI("https://ip-info.com/json_lite?ip=8.8.8.8")
 response = Net::HTTP.start(uri.host, uri.port,
     use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 10) do |http|
   http.get(uri.request_uri)

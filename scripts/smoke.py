@@ -15,15 +15,27 @@ def main():
     for ip in ['8.8.8.8','1.1.1.1','2001:4860:4860::8888']:
         status,h,body=request(base,'/json?ip='+ip); data=json.loads(body)
         assert status==200,(status,data);assert data['ip']==ip;assert h['Cache-Control']=='no-store';assert h['X-Robots-Tag']=='noindex'
+        expected={name:data[source] for name,source in [('country_code','country'),('region','region'),('city','city'),('timezone','timezone')]}
+        for path in ['/json_lite?ip='+ip, '/'+ip+'/json_lite']:
+            status,h,body=request(base,path)
+            assert status==200,(path,status,body)
+            assert json.loads(body)==expected,(path,body)
+            assert h['Content-Type']=='application/json'
+            assert h['Cache-Control']=='no-store';assert h['X-Robots-Tag']=='noindex'
     assert request(base,'/json?ip=127.0.0.1')[0]==400
+    assert request(base,'/json_lite?ip=127.0.0.1')[0]==400
     assert request(base,'/readyz')[0]==200
     assert request(base,'/no-such-page')[0]==404
     for path in ['/','/docs','/ai','/about','/terms','/privacy','/cookies','/llms.txt','/llms-full.txt','/openapi.json','/sitemap.xml','/robots.txt','/share.png']:
         assert request(base,path)[0]==200,path
     if args.production:
-        status,_,body=request(base,'/json');assert status==200,'Caller detection or HTTP redirect failure';ip=json.loads(body)['ip']
+        status,_,body=request(base,'/json');assert status==200,'Caller detection or HTTP redirect failure';full=json.loads(body);ip=full['ip']
+        status,_,body=request(base,'/json_lite');assert status==200,'Lite caller detection or HTTP redirect failure'
+        expected={name:full[source] for name,source in [('country_code','country'),('region','region'),('city','city'),('timezone','timezone')]}
+        assert json.loads(body)==expected
         for header in ['X-Forwarded-For','CDN-Real-IP','X-Real-IP']:
             status,_,body=request(base,'/json',{header:'1.1.1.1'});assert status==200;assert json.loads(body)['ip']==ip,'Spoofable '+header
+            status,_,body=request(base,'/json_lite',{header:'1.1.1.1'});assert status==200;assert json.loads(body)==expected,'Spoofable lite '+header
         _,h,_=request(base,'/');assert h.get('X-Robots-Tag')!='noindex','Production is not indexable'
     print('All smoke checks passed for '+base)
 if __name__=='__main__':main()

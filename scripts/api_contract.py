@@ -31,6 +31,17 @@ FIELDS = [
     ("is_anycast", "boolean", True, True, "Anycast classification; not a VPN or proxy detection flag."),
 ]
 EXAMPLE = {name: sample for name, _, _, sample, _ in FIELDS}
+LITE_FIELD_SOURCES = {
+    "country_code": "country",
+    "region": "region",
+    "city": "city",
+    "timezone": "timezone",
+}
+LITE_FIELDS = [
+    (name, *next(field[1:] for field in FIELDS if field[0] == source))
+    for name, source in LITE_FIELD_SOURCES.items()
+]
+LITE_EXAMPLE = {name: sample for name, _, _, sample, _ in LITE_FIELDS}
 ERRORS = {
     "400": ("invalid_ip", "Malformed, conflicting, non-public, or unsupported lookup input."),
     "404": ("ip_not_found", "No record in the active database."),
@@ -42,14 +53,21 @@ ERRORS = {
 
 def openapi():
     props = {name: {"type": [kind, "null"] if nullable else kind, "description": desc, "examples": [value]} for name, kind, nullable, value, desc in FIELDS}
-    def operation(op, path=False):
+    lite_props = {name: {"type": [kind, "null"] if nullable else kind, "description": desc, "examples": [value]} for name, kind, nullable, value, desc in LITE_FIELDS}
+    def operation(op, path=False, lite=False):
         params = [{"name":"ip", "in":"query", "required":False,"schema":{"type":"string"},"description":"Public IPv4 or IPv6 literal. Omit to detect caller. Must match path IP when both are supplied.","example":"8.8.8.8"}]
         if path:
             params.insert(0, {"name":"ip", "in":"path","required":True,"schema":{"type":"string"},"description":"Public IPv4 or IPv6 literal.","example":"8.8.8.8"})
-        responses = {"200":{"description":"IP lookup result; missing attributes are null.","headers":{"Cache-Control":{"schema":{"type":"string"},"example":"no-store"}},"content":{"application/json":{"schema":{"$ref":"#/components/schemas/IpInfo"},"example":EXAMPLE}}}}
+        schema = "IpInfoLite" if lite else "IpInfo"
+        responses = {"200":{"description":"IP lookup result; missing attributes are null.","headers":{"Cache-Control":{"schema":{"type":"string"},"example":"no-store"}},"content":{"application/json":{"schema":{"$ref":f"#/components/schemas/{schema}"},"example":LITE_EXAMPLE if lite else EXAMPLE}}}}
         for status,(code, desc) in ERRORS.items():
             responses[status] = {"description":desc,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"},"example":{"error":{"code":code,"message":desc}}}}}
-        return {"operationId":op,"summary":"Look up a supplied IP" if path else "Look up the caller or a supplied IP", "description":"Free, no API key. Caller detection returns the requesting machine or proxy exit, not necessarily the human user's IP.","security":[],"parameters":params,"responses":responses}
+        summary = "Look up a supplied IP" if path else "Look up the caller or a supplied IP"
+        description = "Free, no API key. Caller detection returns the requesting machine or proxy exit, not necessarily the human user's IP."
+        if lite:
+            summary += " with minimal location JSON"
+            description += " Returns compact JSON with exactly country_code, region, city and timezone. All four keys are always present; unavailable values are null. country_code is the same two-letter ISO code as country in /json."
+        return {"operationId":op,"summary":summary,"description":description,"security":[],"parameters":params,"responses":responses}
     myip = {
         "operationId": "getMyIp",
         "summary": "Return only the caller IP as plain text",
@@ -65,4 +83,4 @@ def openapi():
         },
     }
     myip["responses"]["400"]["description"] = "Unable to determine the caller IP, or invalid/missing trusted-ingress headers."
-    return {"openapi":"3.1.0","info":{"title":"IP Info by Shifter","version":"1.0.0","description":"Free public IP geolocation and ASN API. Maintained and supported by Shifter. No signup or API key.","termsOfService":"https://ip-info.com/terms","contact":{"name":"Shifter","url":"https://shifter.io","email":"hi@shifter.io"}},"servers":[{"url":"https://ip-info.com"},{"url":"http://ip-info.com"}],"security":[],"paths":{"/myip":{"get":myip},"/json":{"get":operation("lookupIp")},"/{ip}/json":{"get":operation("lookupIpByPath",True)}},"components":{"schemas":{"IpInfo":{"type":"object","required":list(props),"additionalProperties":False,"properties":props},"Error":{"type":"object","required":["error"],"additionalProperties":False,"properties":{"error":{"type":"object","required":["code","message"],"additionalProperties":False,"properties":{"code":{"type":"string"},"message":{"type":"string"}}}}}}}}
+    return {"openapi":"3.1.0","info":{"title":"IP Info by Shifter","version":"1.1.0","description":"Free public IP geolocation and ASN API. Maintained and supported by Shifter. No signup or API key.","termsOfService":"https://ip-info.com/terms","contact":{"name":"Shifter","url":"https://shifter.io","email":"hi@shifter.io"}},"servers":[{"url":"https://ip-info.com"},{"url":"http://ip-info.com"}],"security":[],"paths":{"/myip":{"get":myip},"/json":{"get":operation("lookupIp")},"/{ip}/json":{"get":operation("lookupIpByPath",True)},"/json_lite":{"get":operation("lookupIpLite",lite=True)},"/{ip}/json_lite":{"get":operation("lookupIpLiteByPath",True,True)}},"components":{"schemas":{"IpInfo":{"type":"object","required":list(props),"additionalProperties":False,"properties":props},"IpInfoLite":{"type":"object","required":list(lite_props),"additionalProperties":False,"properties":lite_props},"Error":{"type":"object","required":["error"],"additionalProperties":False,"properties":{"error":{"type":"object","required":["code","message"],"additionalProperties":False,"properties":{"code":{"type":"string"},"message":{"type":"string"}}}}}}}}

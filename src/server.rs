@@ -1,6 +1,9 @@
-use crate::{database::Database, network};
+use crate::{
+    database::{Database, LookupLiteResponse},
+    network,
+};
 use axum::{
-    Router,
+    Json, Router,
     body::Body,
     extract::{Path, Query, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
@@ -145,8 +148,10 @@ struct Params {
 pub fn app(state: Arc<AppState>) -> Router {
     let api = Router::new()
         .route("/myip", get(my_ip))
-        .route("/json", get(lookup_self))
-        .route("/{ip}/json", get(lookup_path))
+        .route("/json", get(lookup_self::<false>))
+        .route("/{ip}/json", get(lookup_path::<false>))
+        .route("/json_lite", get(lookup_self::<true>))
+        .route("/{ip}/json_lite", get(lookup_path::<true>))
         .method_not_allowed_fallback(|| async {
             error(
                 StatusCode::METHOD_NOT_ALLOWED,
@@ -423,11 +428,12 @@ async fn common(State(s): State<Arc<AppState>>, req: Request, next: Next) -> Res
             .map(|(k, v)| k.as_str().len() + v.len())
             .sum::<usize>();
     let path = req.uri().path();
-    let api_path = path == "/myip"
-        || path == "/json"
-        || path.ends_with("/json")
-        || path == "/healthz"
-        || path == "/readyz";
+    let normalized_path = path.trim_end_matches('/');
+    let api_path = normalized_path == "/myip"
+        || normalized_path.ends_with("/json")
+        || normalized_path.ends_with("/json_lite")
+        || normalized_path == "/healthz"
+        || normalized_path == "/readyz";
     let mut response = if size > 16384 {
         error(
             StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
@@ -534,24 +540,24 @@ async fn my_ip(
         Err(e) => bad(e),
     }
 }
-async fn lookup_self(
+async fn lookup_self<const LITE: bool>(
     State(s): State<Arc<AppState>>,
     params: ParsedParams,
     headers: HeaderMap,
     peer: Option<axum::Extension<Peer>>,
 ) -> Response {
-    lookup(s, None, params, headers, peer.map(|p| p.0.0))
+    lookup::<LITE>(s, None, params, headers, peer.map(|p| p.0.0))
 }
-async fn lookup_path(
+async fn lookup_path<const LITE: bool>(
     State(s): State<Arc<AppState>>,
     Path(ip): Path<String>,
     params: ParsedParams,
     headers: HeaderMap,
     peer: Option<axum::Extension<Peer>>,
 ) -> Response {
-    lookup(s, Some(ip), params, headers, peer.map(|p| p.0.0))
+    lookup::<LITE>(s, Some(ip), params, headers, peer.map(|p| p.0.0))
 }
-fn lookup(
+fn lookup<const LITE: bool>(
     s: Arc<AppState>,
     path: Option<String>,
     params: ParsedParams,
@@ -597,7 +603,13 @@ fn lookup(
         );
     };
     match db.lookup(ip) {
-        Ok(Some(record)) => pretty_json(record),
+        Ok(Some(record)) => {
+            if LITE {
+                Json(LookupLiteResponse::from(record)).into_response()
+            } else {
+                pretty_json(record)
+            }
+        }
         Ok(None) => error(
             StatusCode::NOT_FOUND,
             "ip_not_found",

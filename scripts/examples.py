@@ -1,6 +1,6 @@
 LANGUAGES = {'curl':'cURL','javascript':'JavaScript / Node.js','python':'Python','php':'PHP','go':'Go','rust':'Rust','java':'Java','csharp':'C#','ruby':'Ruby'}
 def example(language, mode):
-    url = 'https://ip-info.com/json' + ('?ip=8.8.8.8' if mode == 'custom' else '')
+    url = 'https://ip-info.com/json' + ('_lite' if mode.endswith('_lite') else '') + ('?ip=8.8.8.8' if mode.startswith('custom') else '')
     templates = {
       'curl': 'curl --fail --max-time 10 "URL"',
       'javascript': '''// Node.js 18+ or a modern browser
@@ -84,4 +84,4 @@ raise "HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
 puts JSON.parse(response.body)'''
     }
     return templates[language].replace('URL',url)
-EXAMPLES = {lang:{mode:example(lang,mode) for mode in ['self','custom']} for lang in LANGUAGES}
+EXAMPLES = {lang:{mode:example(lang,mode) for mode in ['self','custom','self_lite','custom_lite']} for lang in LANGUAGES}

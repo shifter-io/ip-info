@@ -77,7 +77,7 @@ main{max-width:1040px;padding:48px 40px 80px;margin:auto}h1,h2,h3{line-height:1.
 </tr>
 <tr>
 <td><strong>Predictable JSON</strong></td>
-<td>Read 29 consistently present fields, with <code>null</code> for unavailable values.</td>
+<td>Choose 29 fields with <code>/json</code> or just four location fields with <code>/json_lite</code>, with <code>null</code> for unavailable values.</td>
 </tr>
 <tr>
 <td><strong>Agent-readable documentation</strong></td>
@@ -98,6 +98,9 @@ main{max-width:1040px;padding:48px 40px 80px;margin:auto}h1,h2,h3{line-height:1.
 <h3 id="look-up-an-ip-address">Look up an IP address</h3>
 <pre><code class="language-sh"># Your public IP with geolocation and network data
 curl --fail --max-time 15 https://ip-info.com/json
+
+# Only country code, region, city and timezone
+curl --fail --max-time 15 https://ip-info.com/json_lite
 
 # Only your public IP, as plain text
 curl --fail --max-time 15 https://ip-info.com/myip
@@ -127,6 +130,22 @@ curl --fail --max-time 15 https://ip-info.com/8.8.8.8/json
 }
 </code></pre>
 <p>The full response includes 29 fields covering location, geographic identifiers, network information, and database classifications. See the <a href="https://github.com/shifter-io/ip-info/blob/main/tests/example.json">complete example</a> and <a href="https://ip-info.com/docs?utm_source=github&amp;utm_medium=referral&amp;utm_campaign=ip_info&amp;utm_content=readme_fields#fields">field reference</a>.</p>
+<h3 id="minimal-location-response">Minimal location response</h3>
+<p>Use <code>/json_lite</code> when you need only the location. It returns compact JSON with exactly four keys:</p>
+<pre><code class="language-json">{&quot;country_code&quot;:&quot;US&quot;,&quot;region&quot;:&quot;California&quot;,&quot;city&quot;:&quot;Mountain View&quot;,&quot;timezone&quot;:&quot;America/Los_Angeles&quot;}
+</code></pre>
+<p>The values above are illustrative. All four keys are always present; unavailable values are <code>null</code>. <code>country_code</code> is the same two-letter ISO country code returned as <code>country</code> by <code>/json</code>. The full response keeps its existing field names.</p>
+<pre><code class="language-sh"># Your connection's location
+curl --fail --max-time 15 https://ip-info.com/json_lite
+
+# A specific IPv4 or IPv6 address
+curl --fail --max-time 15 'https://ip-info.com/json_lite?ip=8.8.8.8'
+curl --fail --max-time 15 'https://ip-info.com/json_lite?ip=2001:4860:4860::8888'
+
+# Equivalent path-based lookup
+curl --fail --max-time 15 https://ip-info.com/8.8.8.8/json_lite
+</code></pre>
+<p>Lite lookups share the full endpoint's caller detection, validation, database requirements, errors and CORS support. See the <a href="https://ip-info.com/docs#json-lite">lite field reference</a>. The code examples on the homepage and documentation page offer a <strong>Full JSON / Lite JSON</strong> selector.</p>
 <h3 id="javascript">JavaScript</h3>
 <p>Works in modern browsers and Node.js with built-in <code>fetch</code>:</p>
 <pre><code class="language-js">const response = await fetch(&quot;https://ip-info.com/json?ip=8.8.8.8&quot;, {
@@ -172,9 +191,11 @@ print(info[&quot;ip&quot;], info[&quot;country&quot;], info[&quot;asn&quot;])
 
 For a supplied IP: GET https://ip-info.com/json?ip=&lt;URL-encoded-IP&gt;
 For your runtime's network exit: GET https://ip-info.com/json
+For only location: GET https://ip-info.com/json_lite (or add ?ip=&lt;URL-encoded-IP&gt;)
 For only your runtime's IP: GET https://ip-info.com/myip
 
-Use country for two-letter country-code comparisons and asn for numeric ASN checks.
+Use country in /json or country_code in /json_lite for country-code comparisons.
+The lite response contains only country_code, region, city and timezone. Use /json for ASN checks.
 Treat null as unavailable. Do not invent missing values.
 Your runtime's IP is not necessarily the human user's IP.
 Location is approximate; these fields do not prove VPN or proxy status.
