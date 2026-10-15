@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "IP Info by Shifter",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Free public IP geolocation and ASN API. Maintained and supported by Shifter. No signup or API key.",
     "termsOfService": "https://ip-info.com/terms",
     "contact": {
@@ -457,6 +457,300 @@
           }
         }
       }
+    },
+    "/json_lite": {
+      "get": {
+        "operationId": "lookupIpLite",
+        "summary": "Look up the caller or a supplied IP with minimal location JSON",
+        "description": "Free, no API key. Caller detection returns the requesting machine or proxy exit, not necessarily the human user's IP. Returns compact JSON with exactly country_code, region, city and timezone. All four keys are always present; unavailable values are null. country_code is the same two-letter ISO code as country in /json.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Public IPv4 or IPv6 literal. Omit to detect caller. Must match path IP when both are supplied.",
+            "example": "8.8.8.8"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IP lookup result; missing attributes are null.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "no-store"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpInfoLite"
+                },
+                "example": {
+                  "country_code": "US",
+                  "region": "California",
+                  "city": "Mountain View",
+                  "timezone": "America/Los_Angeles"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed, conflicting, non-public, or unsupported lookup input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "invalid_ip",
+                    "message": "Malformed, conflicting, non-public, or unsupported lookup input."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No record in the active database.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "ip_not_found",
+                    "message": "No record in the active database."
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Use GET for lookups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "method_not_allowed",
+                    "message": "Use GET for lookups."
+                  }
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Request headers exceed the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "request_too_large",
+                    "message": "Request headers exceed the configured limit."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "database_unavailable",
+                    "message": "Database unavailable; retry later with backoff."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Request timed out; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "timeout",
+                    "message": "Request timed out; retry later with backoff."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{ip}/json_lite": {
+      "get": {
+        "operationId": "lookupIpLiteByPath",
+        "summary": "Look up a supplied IP with minimal location JSON",
+        "description": "Free, no API key. Caller detection returns the requesting machine or proxy exit, not necessarily the human user's IP. Returns compact JSON with exactly country_code, region, city and timezone. All four keys are always present; unavailable values are null. country_code is the same two-letter ISO code as country in /json.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "ip",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Public IPv4 or IPv6 literal.",
+            "example": "8.8.8.8"
+          },
+          {
+            "name": "ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Public IPv4 or IPv6 literal. Omit to detect caller. Must match path IP when both are supplied.",
+            "example": "8.8.8.8"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IP lookup result; missing attributes are null.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "no-store"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpInfoLite"
+                },
+                "example": {
+                  "country_code": "US",
+                  "region": "California",
+                  "city": "Mountain View",
+                  "timezone": "America/Los_Angeles"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed, conflicting, non-public, or unsupported lookup input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "invalid_ip",
+                    "message": "Malformed, conflicting, non-public, or unsupported lookup input."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No record in the active database.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "ip_not_found",
+                    "message": "No record in the active database."
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Use GET for lookups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "method_not_allowed",
+                    "message": "Use GET for lookups."
+                  }
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Request headers exceed the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "request_too_large",
+                    "message": "Request headers exceed the configured limit."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "database_unavailable",
+                    "message": "Database unavailable; retry later with backoff."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Request timed out; retry later with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "timeout",
+                    "message": "Request timed out; retry later with backoff."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -781,6 +1075,58 @@
             "description": "Anycast classification; not a VPN or proxy detection flag.",
             "examples": [
               true
+            ]
+          }
+        }
+      },
+      "IpInfoLite": {
+        "type": "object",
+        "required": [
+          "country_code",
+          "region",
+          "city",
+          "timezone"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "country_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Two-letter ISO country code.",
+            "examples": [
+              "US"
+            ]
+          },
+          "region": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "First administrative subdivision in English.",
+            "examples": [
+              "California"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "City name in English.",
+            "examples": [
+              "Mountain View"
+            ]
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "IANA time zone name.",
+            "examples": [
+              "America/Los_Angeles"
             ]
           }
         }

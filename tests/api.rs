@@ -226,11 +226,17 @@ async fn myip_respects_proxy_and_ingress_trust() {
 }
 #[tokio::test]
 async fn unavailable_db_and_health() {
-    let (s, h, v) = call(missing(), "/json?ip=8.8.8.8", "GET", &[]).await;
-    assert_eq!(s, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(v["error"]["code"], "database_unavailable");
-    assert_eq!(h["cache-control"], "no-store");
-    assert_eq!(h["x-robots-tag"], "noindex");
+    for path in [
+        "/json?ip=8.8.8.8",
+        "/json_lite?ip=8.8.8.8",
+        "/8.8.8.8/json_lite",
+    ] {
+        let (s, h, v) = call(missing(), path, "GET", &[]).await;
+        assert_eq!(s, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(v["error"]["code"], "database_unavailable");
+        assert_eq!(h["cache-control"], "no-store");
+        assert_eq!(h["x-robots-tag"], "noindex");
+    }
     assert_eq!(
         call(missing(), "/healthz", "GET", &[]).await.0,
         StatusCode::OK
@@ -252,13 +258,143 @@ async fn invalid_inputs_and_methods() {
         "/8.8.8.8/json?ip=1.1.1.1",
         "/json?ip=8.8.8.8%3A80",
     ] {
-        let (status, _, v) = call(missing(), path, "GET", &[]).await;
-        assert_eq!(status, StatusCode::BAD_REQUEST, "{path}");
-        assert_eq!(v["error"]["code"], "invalid_ip");
+        for route in [path.to_string(), path.replace("/json", "/json_lite")] {
+            let (status, _, v) = call(missing(), &route, "GET", &[]).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{route}");
+            assert_eq!(v["error"]["code"], "invalid_ip");
+        }
     }
-    let (status, _, v) = call(missing(), "/json", "POST", &[]).await;
-    assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
-    assert_eq!(v["error"]["code"], "method_not_allowed");
+    for route in ["/json", "/json_lite", "/8.8.8.8/json_lite"] {
+        let (status, _, v) = call(missing(), route, "POST", &[]).await;
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(v["error"]["code"], "method_not_allowed");
+    }
+}
+
+#[test]
+fn lite_response_keeps_unavailable_fields_as_null() {
+    let response = ip_info::database::LookupLiteResponse {
+        country_code: None,
+        region: None,
+        city: None,
+        timezone: None,
+    };
+    assert_eq!(
+        serde_json::to_value(response).unwrap(),
+        serde_json::json!({
+            "country_code": null, "region": null, "city": null, "timezone": null
+        })
+    );
+}
+
+#[tokio::test]
+async fn lite_headers_cors_redirects_and_missing_caller() {
+    let router = app(Arc::new(AppState::load(
+        "/no-such-mmdb",
+        Config {
+            indexable: true,
+            ..Config::default()
+        },
+    )));
+    let (status, _, body) = call(router.clone(), "/json_lite", "GET", &[]).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["code"], "invalid_ip");
+    for path in ["/json_lite", "/8.8.8.8/json_lite"] {
+        let (status, headers, body) =
+            call_raw(router.clone(), &format!("{path}?ip=8.8.8.8"), "HEAD", &[]).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(headers["content-type"], "application/json");
+        assert_eq!(headers["cache-control"], "no-store");
+        assert_eq!(headers["x-robots-tag"], "noindex");
+        assert!(body.is_empty());
+        let (status, headers, _) = call(
+            router.clone(),
+            path,
+            "OPTIONS",
+            &[
+                ("origin", "https://example.com"),
+                ("access-control-request-method", "GET"),
+            ],
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers["access-control-allow-origin"], "*");
+        let (status, headers, body) = call(
+            router.clone(),
+            path,
+            "GET",
+            &[("x-large", &"x".repeat(17000))],
+        )
+        .await;
+        assert_eq!(status, StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE);
+        assert_eq!(body["error"]["code"], "request_too_large");
+        assert_eq!(headers["cache-control"], "no-store");
+        assert_eq!(headers["x-robots-tag"], "noindex");
+    }
+    for path in ["/json", "/8.8.8.8/json", "/json_lite", "/8.8.8.8/json_lite"] {
+        let (status, headers, _) =
+            call(router.clone(), &format!("{path}/?ip=8.8.8.8"), "GET", &[]).await;
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(headers["location"], format!("{path}?ip=8.8.8.8"));
+        assert_eq!(headers["cache-control"], "no-store");
+        assert_eq!(headers["x-robots-tag"], "noindex");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires the private DB-IP MMDB"]
+async fn real_lite_lookup_matches_full_location_for_all_lookup_modes() {
+    let schema: Value = serde_json::from_str(include_str!("../web/openapi.json")).unwrap();
+    let fields = schema["components"]["schemas"]["IpInfoLite"]["properties"]
+        .as_object()
+        .unwrap();
+    assert_eq!(fields.len(), 4);
+    for ip in [
+        "8.8.8.8",
+        "1.1.1.1",
+        "2001:4860:4860::8888",
+        "::ffff:8.8.8.8",
+    ] {
+        let (status, _, full) = call(real(), &format!("/json?ip={ip}"), "GET", &[]).await;
+        assert_eq!(status, StatusCode::OK);
+        let expected = serde_json::json!({
+            "country_code": full["country"], "region": full["region"],
+            "city": full["city"], "timezone": full["timezone"]
+        });
+        let router = real().layer(axum::Extension(Peer(ip.parse().unwrap())));
+        for path in [
+            "/json_lite".to_string(),
+            format!("/json_lite?ip={ip}"),
+            format!("/{ip}/json_lite"),
+            format!("/{ip}/json_lite?ip={ip}"),
+        ] {
+            let (status, headers, bytes) = call_raw(
+                router.clone(),
+                &path,
+                "GET",
+                &[
+                    ("origin", "https://example.com"),
+                    ("x-forwarded-for", "9.9.9.9"),
+                    ("cdn-real-ip", "9.9.9.9"),
+                ],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{path}");
+            assert_eq!(headers["content-type"], "application/json");
+            assert_eq!(headers["cache-control"], "no-store");
+            assert_eq!(headers["x-robots-tag"], "noindex");
+            assert_eq!(headers["access-control-allow-origin"], "*");
+            let actual: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(actual, expected, "{path}");
+            assert!(fields.keys().all(|name| actual.get(name).is_some()));
+            assert!(!bytes.contains(&b'\n'), "Lite JSON must be compact");
+            assert!(bytes.len() < serde_json::to_vec(&full).unwrap().len());
+            let (status, headers, bytes) = call_raw(router.clone(), &path, "HEAD", &[]).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(headers["content-type"], "application/json");
+            assert!(bytes.is_empty());
+        }
+    }
 }
 #[tokio::test]
 async fn proxy_page_and_brand_assets_are_embedded_without_a_database() {

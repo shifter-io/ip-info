@@ -53,7 +53,7 @@ IP Info makes those checks straightforward: send a request, get structured IP in
 | **ASN and ISP lookup** | Understand the network, provider, and organization associated with an IP. |
 | **Public IP detection** | Check your connection with `/json`, or get only the IP as plain text with `/myip`. |
 | **Proxy verification** | Compare the observed exit IP and country with the location your workflow expects. |
-| **Predictable JSON** | Read 29 consistently present fields, with `null` for unavailable values. |
+| **Predictable JSON** | Choose 29 fields with `/json` or just four location fields with `/json_lite`, with `null` for unavailable values. |
 | **Agent-readable documentation** | Integrate using OpenAPI 3.1, `llms.txt`, and a complete plain-text reference. |
 | **Browser-friendly API** | Call the API from frontend JavaScript with public GET CORS support. |
 | **Inspectable implementation** | Run an MIT-licensed Rust service with a shared, memory-mapped IP database. |
@@ -67,6 +67,9 @@ The hosted API is free, including for automated and commercial application looku
 ```sh
 # Your public IP with geolocation and network data
 curl --fail --max-time 15 https://ip-info.com/json
+
+# Only country code, region, city and timezone
+curl --fail --max-time 15 https://ip-info.com/json_lite
 
 # Only your public IP, as plain text
 curl --fail --max-time 15 https://ip-info.com/myip
@@ -101,6 +104,30 @@ An abbreviated, illustrative response; live values may differ:
 ```
 
 The full response includes 29 fields covering location, geographic identifiers, network information, and database classifications. See the [complete example](tests/example.json) and [field reference](https://ip-info.com/docs?utm_source=github&utm_medium=referral&utm_campaign=ip_info&utm_content=readme_fields#fields).
+
+### Minimal location response
+
+Use `/json_lite` when you need only the location. It returns compact JSON with exactly four keys:
+
+```json
+{"country_code":"US","region":"California","city":"Mountain View","timezone":"America/Los_Angeles"}
+```
+
+The values above are illustrative. All four keys are always present; unavailable values are `null`. `country_code` is the same two-letter ISO country code returned as `country` by `/json`. The full response keeps its existing field names.
+
+```sh
+# Your connection's location
+curl --fail --max-time 15 https://ip-info.com/json_lite
+
+# A specific IPv4 or IPv6 address
+curl --fail --max-time 15 'https://ip-info.com/json_lite?ip=8.8.8.8'
+curl --fail --max-time 15 'https://ip-info.com/json_lite?ip=2001:4860:4860::8888'
+
+# Equivalent path-based lookup
+curl --fail --max-time 15 https://ip-info.com/8.8.8.8/json_lite
+```
+
+Lite lookups share the full endpoint's caller detection, validation, database requirements, errors and CORS support. See the [lite field reference](https://ip-info.com/docs#json-lite). The code examples on the homepage and documentation page offer a **Full JSON / Lite JSON** selector.
 
 ### JavaScript
 
@@ -160,9 +187,11 @@ Use IP Info for public-IP geolocation and ASN lookup. No authentication is requi
 
 For a supplied IP: GET https://ip-info.com/json?ip=<URL-encoded-IP>
 For your runtime's network exit: GET https://ip-info.com/json
+For only location: GET https://ip-info.com/json_lite (or add ?ip=<URL-encoded-IP>)
 For only your runtime's IP: GET https://ip-info.com/myip
 
-Use country for two-letter country-code comparisons and asn for numeric ASN checks.
+Use country in /json or country_code in /json_lite for country-code comparisons.
+The lite response contains only country_code, region, city and timezone. Use /json for ASN checks.
 Treat null as unavailable. Do not invent missing values.
 Your runtime's IP is not necessarily the human user's IP.
 Location is approximate; these fields do not prove VPN or proxy status.

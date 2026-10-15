@@ -4,7 +4,7 @@ import html, json, re, struct, sys, xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
-from api_contract import FIELDS, EXAMPLE, openapi
+from api_contract import FIELDS, EXAMPLE, LITE_FIELDS, LITE_EXAMPLE, openapi
 from text_checks import assert_clean_html
 ROOT=Path(__file__).resolve().parents[1]; WEB=ROOT/'web'
 class Page(HTMLParser):
@@ -14,9 +14,19 @@ class Page(HTMLParser):
 def main():
     spec=json.loads((WEB/'openapi.json').read_text());assert spec==openapi()
     assert json.loads((ROOT/'tests/example.json').read_text())==EXAMPLE
+    assert json.loads((ROOT/'tests/lite-example.json').read_text())==LITE_EXAMPLE
+    lite_schema=spec['components']['schemas']['IpInfoLite']
+    assert lite_schema['required']==['country_code','region','city','timezone']
+    assert set(lite_schema['properties'])==set(lite_schema['required'])
+    assert lite_schema['additionalProperties'] is False
+    for route in ['/json_lite','/{ip}/json_lite']:
+        response=spec['paths'][route]['get']['responses']['200']['content']['application/json']
+        assert response['schema']['$ref']=='#/components/schemas/IpInfoLite'
+        assert response['example']==LITE_EXAMPLE
     assert spec['security']==[]
     known={'/':WEB/'index.html', **{'/'+p.stem:p for p in WEB.glob('*.html')}, **{'/'+p.name:p for p in WEB.iterdir()}}
-    known.update({'/json':None,'/healthz':None,'/readyz':None})
+    known.update({route:None for route in spec['paths']})
+    known.update({'/healthz':None,'/readyz':None})
     titles=[];descs=[]
     for filename in [p.stem for p in sorted(WEB.glob('*.html'))]:
         text=(WEB/(filename+'.html')).read_text(encoding='utf-8'); page=Page(text)
@@ -69,6 +79,16 @@ def main():
     urls=ET.fromstring((WEB/'sitemap.xml').read_text());assert len(urls)==8
     docs=(WEB/'docs.html').read_text();full=(WEB/'llms-full.txt').read_text()
     for name,*_ in FIELDS: assert f'<dt>{name}<' in docs;assert f'- {name} (' in full
+    for name,*_ in LITE_FIELDS: assert f'<dt>{name}<' in docs;assert f'- {name} (' in full
+    for filename in ['index.html','docs.html','ai.html','about.html','llms.txt','llms-full.txt']:
+        assert '/json_lite' in (WEB/filename).read_text(), filename
+    for filename in ['index.html','docs.html']:
+        text=(WEB/filename).read_text()
+        assert 'id="example-format"' in text
+        examples=json.loads(re.search(r'<script id="examples-data" type="application/json">(.*?)</script>',text,re.S).group(1))
+        for modes in examples.values():
+            assert 'https://ip-info.com/json_lite' in modes['self_lite']
+            assert 'https://ip-info.com/json_lite?ip=8.8.8.8' in modes['custom_lite']
     assert (WEB/'share.png').read_bytes()[:8]==b'\x89PNG\r\n\x1a\n'
     png=(WEB/'favicon.png').read_bytes()
     assert png[:8]==b'\x89PNG\r\n\x1a\n' and struct.unpack('>II',png[16:24])==(96,96)
@@ -90,5 +110,5 @@ def main():
         assert struct.unpack('>II',frame[16:24])==(size,size)
     for output in [*WEB.glob('*.html'), WEB/'openapi.json', WEB/'llms.txt', WEB/'llms-full.txt']:
         assert 'database_date' not in output.read_text(), output
-    print(f'Validated {len(titles)} pages, clean metadata, crawlable favicons, internal links/anchors, structured JSON, sitemap, {len(FIELDS)} response fields and OpenAPI consistency.')
+    print(f'Validated {len(titles)} pages, clean metadata, crawlable favicons, internal links/anchors, structured JSON, sitemap, {len(FIELDS)} full / {len(LITE_FIELDS)} lite response fields and OpenAPI consistency.')
 if __name__=='__main__':main()

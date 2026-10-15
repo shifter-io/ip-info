@@ -81,8 +81,9 @@ body:is([data-page="/terms"],[data-page="/privacy"],[data-page="/cookies"],[data
 <div class="callout">Deployed on Bunny Magic Containers at https://ip-info.com on September 29, 2026. The image is in private GitHub Container Registry. GA4 and Search Console provisioning remain follow-up tasks.</div>
 <h2>Local start</h2><pre><code>cargo run --release --locked
 # Open http://127.0.0.1:8080
-curl -i 'http://127.0.0.1:8080/json?ip=8.8.8.8'</code></pre><p>The default caller on localhost is a loopback IP and is intentionally rejected. Use a supplied public IP for local testing. Keep the server running to use the website’s lookup form. The static HTML files in <code>web/</code> can be opened directly; under file URLs their lookup widget targets the production API.</p>
-<h2>Files and reproducibility</h2><p><code>scripts/api_contract.py</code> is the shared field/schema/example source. <code>scripts/generate_site.py</code> builds the standalone pages, OpenAPI, text references and Rust response type. Design sources are in <code>site/</code>. Generated pages are embedded into the binary; rebuild Rust after regenerating them.</p><pre><code>python3 scripts/generate_site.py
+curl -i 'http://127.0.0.1:8080/json?ip=8.8.8.8'
+curl -i 'http://127.0.0.1:8080/json_lite?ip=8.8.8.8'</code></pre><p>The default caller on localhost is a loopback IP and is intentionally rejected. Use a supplied public IP for local testing. Keep the server running to use the website’s lookup form. The static HTML files in <code>web/</code> can be opened directly; under file URLs their lookup widget targets the production API.</p>
+<h2>Lookup response formats</h2><p><code>/json</code> and <code>/ADDRESS/json</code> return the full IP record. <code>/json_lite</code> and <code>/ADDRESS/json_lite</code> return compact JSON with exactly <code>country_code</code>, <code>region</code>, <code>city</code> and <code>timezone</code>. Both formats accept an optional <code>?ip=ADDRESS</code> and share caller detection, database readiness, input validation and errors. Unavailable fields are <code>null</code>; <code>country_code</code> maps to the full response’s <code>country</code>. <code>/myip</code> returns the caller IP as plain text without a database lookup.</p><h2>Files and reproducibility</h2><p><code>scripts/api_contract.py</code> is the shared field/schema/example source. <code>scripts/generate_site.py</code> builds the standalone pages, OpenAPI, text references and Rust response type. Design sources are in <code>site/</code>. Generated pages are embedded into the binary; rebuild Rust after regenerating them.</p><pre><code>python3 scripts/generate_site.py
 cargo fmt --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked
@@ -98,7 +99,7 @@ curl --fail 'http://127.0.0.1:8080/json?ip=8.8.8.8'
 docker compose down
 # Bunny commonly uses x86-64: build on this local device for its target.
 docker buildx build --platform linux/amd64 --load -t ip-info:amd64 .</code></pre><p>The image runs as UID/GID 10001 and works with a read-only root filesystem, no added capabilities and no writable volumes. The MMDB sits in its own image layer. Do not upload this commercial image to a public registry. Registry publishing is a separate launch action.</p>
-<h2>Bunny Magic Containers configuration</h2><ol><li>Create a private registry entry and select the tested image digest. Preserve the digest for rollback.</li><li>Expose the container’s HTTP port 8080 through an HTTP(S)/CDN endpoint. TLS terminates at Bunny; origin SSL is off.</li><li>Attach ip-info.com, configure DNS as instructed by Bunny, and issue its managed certificate.</li><li>Disable Force HTTPS and redirects for the API. Do not enable domain-wide HSTS if HTTP access must remain usable. HTTPS canonical tags are already present.</li><li>Explicitly bypass caching for /json, /json?* and /*/json, including errors and redirects. Confirm no edge rule overrides Cache-Control: no-store. Bypass health endpoints too.</li><li>Set readiness to GET /readyz on 8080 and liveness to GET /healthz. Allow at least 30 seconds startup grace for database initialization.</li><li>Keep at least one replica active. Start evaluation with 1 vCPU and 2 GiB memory, then tune against measured working-set and tail-latency results. This is a starting configuration, not a performance guarantee.</li><li>Configure a verified client-IP trust boundary as described below, and set the public GA4 ID only after its property is configured.</li><li>Confirm production privacy details and logging behavior, then set SITE_INDEXABLE=true. Keep preview hosts unindexable.</li></ol><p>Reference: <a href="https://docs.bunny.net/docs/magic-containers-how-to-deploy-your-app">Bunny deployment documentation</a>. Account-side UI and headers must be verified at deployment; this package does not assume that every private source IP is Bunny.</p>
+<h2>Bunny Magic Containers configuration</h2><ol><li>Create a private registry entry and select the tested image digest. Preserve the digest for rollback.</li><li>Expose the container’s HTTP port 8080 through an HTTP(S)/CDN endpoint. TLS terminates at Bunny; origin SSL is off.</li><li>Attach ip-info.com, configure DNS as instructed by Bunny, and issue its managed certificate.</li><li>Disable Force HTTPS and redirects for the API. Do not enable domain-wide HSTS if HTTP access must remain usable. HTTPS canonical tags are already present.</li><li>Explicitly bypass caching for /myip, /json, /json?*, /*/json, /json_lite, /json_lite?* and /*/json_lite, including trailing-slash variants, errors and redirects. Confirm no edge rule overrides Cache-Control: no-store. Bypass health endpoints too.</li><li>Set readiness to GET /readyz on 8080 and liveness to GET /healthz. Allow at least 30 seconds startup grace for database initialization.</li><li>Keep at least one replica active. Start evaluation with 1 vCPU and 2 GiB memory, then tune against measured working-set and tail-latency results. This is a starting configuration, not a performance guarantee.</li><li>Configure a verified client-IP trust boundary as described below, and set the public GA4 ID only after its property is configured.</li><li>Confirm production privacy details and logging behavior, then set SITE_INDEXABLE=true. Keep preview hosts unindexable.</li></ol><p>Reference: <a href="https://docs.bunny.net/docs/magic-containers-how-to-deploy-your-app">Bunny deployment documentation</a>. Account-side UI and headers must be verified at deployment; this package does not assume that every private source IP is Bunny.</p>
 <h2>Caller IP: production ingress</h2><p>The deployed CDN overwrites X-IP-Info-Client-IP with its observed User.IP and sets X-IP-Info-Ingress to a private shared secret. The app verifies this against INGRESS_SECRET and rejects missing, duplicate, or invalid credentials for caller lookups. No trust-all CIDRs are configured. Production spoof tests passed. Rotate the CDN rule and application secret together; never expose this value in client code or logs.</p><h3>Alternative CIDR-based deployments</h3><p>The service must see the user’s actual network exit, not an edge proxy. Determine the exact peer source networks and header behavior of the chosen Bunny endpoint. Configure only those ingress CIDRs. With X-Forwarded-For, Bunny must append its observed caller or replace incoming untrusted values. With a single-IP header, Bunny must overwrite it.</p><p>Do not expose a second origin path that bypasses this trust boundary. Never configure a trust-all range or trust the leftmost X-Forwarded-For entry blindly. If Bunny cannot provide a verified boundary, keep self-detection unlaunched until one is configured; explicit-IP lookups can still be validated.</p><pre><code>curl --fail https://ip-info.com/json
 curl --fail -H 'X-Forwarded-For: 1.1.1.1' https://ip-info.com/json
 curl --fail -H 'CDN-Real-IP: 1.1.1.1' https://ip-info.com/json
@@ -274,10 +275,10 @@ docker exec ip-info-test cat /sys/fs/cgroup/memory.stat</code></pre><p>The bench
   const examples = $('#examples-data') ? JSON.parse($('#examples-data').textContent) : null;
   function renderExample() {
     if (!examples) return;
-    const lang=$('#example-language').value, mode=$('#example-mode').value, protocol=$('#example-protocol').value;
+    const lang=$('#example-language').value, mode=$('#example-mode').value+($('#example-format').value==='json_lite'?'_lite':''), protocol=$('#example-protocol').value;
     $('#example-code').textContent=examples[lang][mode].replaceAll('https://ip-info.com',protocol+'://ip-info.com');
   }
-  for (const id of ['example-language','example-mode','example-protocol']) $('#'+id)?.addEventListener('change',()=>{renderExample();if(id==='example-language')event('language_select',{language:$('#example-language').value});});
+  for (const id of ['example-language','example-mode','example-format','example-protocol']) $('#'+id)?.addEventListener('change',()=>{renderExample();if(id==='example-language')event('language_select',{language:$('#example-language').value});});
   const languageTabs = $('.language-tabs');
   if (languageTabs) {
     languageTabs.hidden = false;
@@ -290,21 +291,22 @@ docker exec ip-info-test cat /sys/fs/cgroup/memory.stat</code></pre><p>The bench
     }));
   }
   // Custom menus keep native selects as the value source and no-JS fallback.
-  for (const id of ['example-mode','example-protocol']) {
+  for (const id of ['example-mode','example-format','example-protocol']) {
     const select = $('#'+id); if (!select) continue;
     const label = select.closest('label');
     const wrapper = document.createElement('div'); wrapper.className='custom-select';
     const trigger = document.createElement('button'); trigger.type='button'; trigger.className='select-trigger';
     trigger.setAttribute('aria-haspopup','listbox'); trigger.setAttribute('aria-expanded','false');
     const menu = document.createElement('div'); menu.className='select-menu'; menu.id=id+'-menu'; menu.hidden=true;
-    menu.setAttribute('role','listbox'); menu.setAttribute('aria-label',id==='example-mode'?'Lookup mode':'Protocol');
+    const controlLabel = {'example-mode':'Lookup','example-format':'Response','example-protocol':'Protocol'}[id];
+    menu.setAttribute('role','listbox'); menu.setAttribute('aria-label',controlLabel);
     trigger.setAttribute('aria-controls',menu.id);
     const options = [...select.options].map(option=>{
       const button=document.createElement('button'); button.type='button'; button.setAttribute('role','option'); button.textContent=option.textContent;
       button.addEventListener('click',()=>{select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));sync();close();trigger.focus();});
       menu.append(button); return button;
     });
-    function sync(){trigger.textContent=select.selectedOptions[0].textContent;trigger.setAttribute('aria-label',(id==='example-mode'?'Lookup: ':'Protocol: ')+trigger.textContent);options.forEach((button,index)=>button.setAttribute('aria-selected',String(select.options[index].selected)));}
+    function sync(){trigger.textContent=select.selectedOptions[0].textContent;trigger.setAttribute('aria-label',controlLabel+': '+trigger.textContent);options.forEach((button,index)=>button.setAttribute('aria-selected',String(select.options[index].selected)));}
     function close(){menu.hidden=true;trigger.setAttribute('aria-expanded','false');}
     function open(){menu.hidden=false;trigger.setAttribute('aria-expanded','true');options[select.selectedIndex].focus();}
     trigger.addEventListener('click',()=>menu.hidden?open():close());
