@@ -569,3 +569,9 @@ async fn authenticated_ingress_rejects_spoofed_headers() {
         StatusCode::BAD_REQUEST
     );
 }
+
+#[test]
+fn red_proof_failing_test() {
+    let n = "ip".len();
+    assert_eq!(n, 3, "deliberate failure for the CI red proof");
+}
