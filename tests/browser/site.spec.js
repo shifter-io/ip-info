@@ -1,6 +1,7 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs');
 const path=require('node:path');
+// Tests tagged @db need the licensed MMDB (README.md, Development); CI runs the others.
 test('every page keeps clean search metadata and loads crawlable icons',async({page,request})=>{
   const titles = new Set();
   for (const route of ['/','/docs','/web-proxy','/ai','/about','/terms','/privacy','/cookies','/missing/nested-page']) {
@@ -26,7 +27,7 @@ test('every page keeps clean search metadata and loads crawlable icons',async({p
     }
   }
 });
-test('desktop lookup, examples, metadata and navigation',async({page})=>{
+test('desktop lookup, examples, metadata and navigation',{tag:'@db'},async({page})=>{
   await page.goto('/');
   await expect(page).toHaveTitle('Free IP Geolocation & ASN API — No API Key | IP Info');
   await expect(page.getByRole('heading',{level:1})).toContainText('Free IP geolocation');
@@ -87,7 +88,7 @@ test('mobile layout, keyboard and visual captures',async({page},testInfo)=>{
   await page.keyboard.press('Enter');
   await page.screenshot({path:testInfo.outputPath('docs-mobile.png'),fullPage:true});
 });
-test('lite examples work on the homepage and docs in every language',async({page})=>{
+test('lite examples work on the homepage and docs in every language',{tag:'@db'},async({page})=>{
   for (const route of ['/','/docs']) {
     await page.goto(route);
     await page.locator('button[aria-controls="example-format-menu"]').click();
@@ -113,7 +114,7 @@ test('lite examples work on the homepage and docs in every language',async({page
   expect(response.status()).toBe(200);
   expect(Object.keys(await response.json())).toEqual(Object.keys(sample));
 });
-test('content and all examples work without JavaScript',async({browser,baseURL})=>{
+test('content and all examples work without JavaScript',{tag:'@db'},async({browser,baseURL})=>{
   const context=await browser.newContext({javaScriptEnabled:false,baseURL});
   const page=await context.newPage();
   await page.goto('/docs');
@@ -128,7 +129,7 @@ test('content and all examples work without JavaScript',async({browser,baseURL})
   await expect(page.locator('body')).toContainText('Mountain View');
   await context.close();
 });
-test('analytics consent, event sanitization and withdrawal',async({page})=>{
+test('analytics consent, event sanitization and withdrawal',{tag:'@db'},async({page})=>{
   // Inject a synthetic public measurement ID into a local response, intercept Google
   // before any network access. No events go to a real analytics property.
   const google=[];

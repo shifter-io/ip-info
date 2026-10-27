@@ -1,0 +1,189 @@
+# Merge checks (README.md, Development) on every ready pull request, every
+# push to main and owner dispatches.
+#
+# Every job runs on the shared CI pool's self-hosted runners: `ci-light` for
+# the change filter and the generated-file checks, `ci-heavy` for the Rust
+# checks and the browser tests. Builds and pinned tools persist between runs
+# under $CI_CACHE_DIR/ip-info, with one Cargo target directory per runner so
+# concurrent runs never share a binary; nothing else is cached. A job-started
+# hook on the servers refuses every job except the owner's own pull requests
+# from branches of this repository, pushes to main, schedules and owner
+# dispatches.
+#
+# A pull request that changes only README.md, LICENSE or docs/ runs only the
+# `artifacts` job. Draft pull requests run nothing until marked ready.
+#
+# Not here: the checks that need the licensed MMDB, which CI never fetches:
+# the ignored database tests (`cargo test --locked -- --ignored`), the browser
+# tests tagged @db and scripts/smoke.py.
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  # Line tables keep file and line in backtraces without full debuginfo.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+
+# timeout-minutes includes the runners' job-started hook, which can take several
+# minutes.
+jobs:
+  # Checkout makes HEAD the pull request merged into its base, so HEAD^1 is
+  # the base and the diff is the request's.
+  changes:
+    name: changes
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: [self-hosted, ci-light]
+    timeout-minutes: 15
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo code=true | tee -a "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # --no-renames lists a moved file under its old path too.
+          files=$(git diff --name-only --no-renames HEAD^1 HEAD)
+          code=false
+          [ -n "$files" ] || code=true
+          grep -qvE '^(README\.md|LICENSE|docs/.+)$' <<< "$files" && code=true
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
+  # Generated files, the toolchain pin and the offline artifact checks. Every
+  # ready pull request runs this job, a docs-only one nothing else.
+  artifacts:
+    name: artifacts
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: [self-hosted, ci-light]
+    timeout-minutes: 15
+    env:
+      # scripts/render_readme.py's only dependency; SHA-256 of the PyPI wheel.
+      MARKDOWN_VERSION: 3.11.2
+      MARKDOWN_SHA256: f80390747a2a0ff2ba54da074ce4f862f72a6685f608cd2637b646a6d83993f5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The Docker build uses the pinned Rust release
+        run: |
+          channel=$(sed -n 's/^channel = "\([0-9.]*\)"$/\1/p' rust-toolchain.toml)
+          minor=${channel%.*}
+          echo "rust-toolchain.toml: ${channel:-missing}; $(grep -m1 '^FROM rust:' Dockerfile)"
+          # The image may name the release (rust:1.94.1-...) or its line (rust:1.94-...).
+          if [ -z "$channel" ] || ! grep -qE "^FROM rust:(${channel//./\\.}|${minor//./\\.})-" Dockerfile; then
+            echo "::error::the Dockerfile's Rust image must use rust-toolchain.toml's release"
+            exit 1
+          fi
+      # scripts/generate_site.py formats the Rust it writes with rustfmt.
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Markdown for scripts/render_readme.py
+        run: |
+          : "${CI_CACHE_DIR:?is not set; this job needs the self-hosted CI runners}"
+          dir="$CI_CACHE_DIR/ip-info/tools/markdown-$MARKDOWN_VERSION"
+          # A virtual environment cannot move, so it is built in place and marked complete.
+          if [ ! -f "$dir/.complete" ]; then
+            rm -rf "$dir"
+            python3 -m venv "$dir"
+            echo "markdown==$MARKDOWN_VERSION --hash=sha256:$MARKDOWN_SHA256" > "$RUNNER_TEMP/requirements.txt"
+            "$dir/bin/pip" install --quiet --disable-pip-version-check --require-hashes --only-binary :all: -r "$RUNNER_TEMP/requirements.txt"
+            touch "$dir/.complete"
+          fi
+          echo "MARKDOWN_PYTHON=$dir/bin/python" >> "$GITHUB_ENV"
+      - name: Generated files are fresh
+        run: |
+          python3 --version
+          python3 scripts/generate_site.py
+          "$MARKDOWN_PYTHON" scripts/render_readme.py
+          git status --short
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::regenerate with scripts/generate_site.py and scripts/render_readme.py and commit the result"
+            exit 1
+          fi
+      - run: python3 scripts/validate_artifacts.py
+
+  # The Rust checks, then the browser tests against the binary the tests built.
+  rust:
+    name: rust
+    needs: changes
+    if: ${{ !cancelled() && !github.event.pull_request.draft && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
+    runs-on: [self-hosted, ci-heavy]
+    timeout-minutes: 30
+    env:
+      NODE_VERSION: 24.21.0
+      npm_config_audit: 'false'
+      npm_config_fund: 'false'
+      npm_config_update_notifier: 'false'
+    steps:
+      - name: The changes job must have succeeded
+        if: needs.changes.result != 'success'
+        env:
+          RESULT: ${{ needs.changes.result }}
+        run: echo "::error::changes job $RESULT" && exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Use the runner's cache
+        run: |
+          : "${CI_CACHE_DIR:?is not set; this job needs the self-hosted CI runners}"
+          cache="$CI_CACHE_DIR/ip-info"
+          {
+            echo "CARGO_TARGET_DIR=$cache/target/rust-$RUNNER_NAME"
+            echo "npm_config_cache=$cache/npm"
+            echo "PLAYWRIGHT_BROWSERS_PATH=$cache/tools/ms-playwright"
+          } >> "$GITHUB_ENV"
+          df -h "$CI_CACHE_DIR"
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      # Also builds the server binary the browser tests start.
+      - run: cargo test --locked
+      - name: Node from the runner
+        run: |
+          echo "node $(node --version), npm $(npm --version)"
+          [ "$(node --version)" = "v$NODE_VERSION" ] || { echo "::error::expected node v$NODE_VERSION"; exit 1; }
+      - run: npm ci
+      # package-lock.json pins Playwright and so the browser build. Headless
+      # runs need only the headless shell; no --with-deps (no sudo here).
+      - run: npx playwright install --only-shell chromium
+      # A free port and TEST_BASE_URL: Playwright's own web server would bind
+      # 8080 and reuse any server already listening there.
+      - name: Browser tests without the database
+        run: |
+          cargo build --locked
+          port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+          BIND_ADDR="127.0.0.1:$port" "$CARGO_TARGET_DIR/debug/ip-info" > "$RUNNER_TEMP/server.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2> /dev/null || true; cat "$RUNNER_TEMP/server.log"' EXIT
+          for _ in $(seq 60); do
+            curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null
+          TEST_BASE_URL="http://127.0.0.1:$port" npm run test:browser -- --grep-invert @db

@@ -316,6 +316,8 @@ python3 scripts/smoke.py http://127.0.0.1:8080
 
 Database integration checks require the licensed local MMDB. Browser checks use Playwright: run `npm ci`, install its browser with `npx playwright install chromium`, then run `npm run test:browser`. Review `playwright.config.js` before using an existing preview. Node.js is used for browser tests, not by the Rust service.
 
+Browser tests that need the database are tagged `@db`; without it, run `npm run test:browser -- --grep-invert @db`. After editing this README, refresh `docs/readme.html` with `python3 scripts/render_readme.py` (requires Markdown). `rust-toolchain.toml` pins the Rust release that CI and the Docker build use. Continuous integration (`.github/workflows/ci.yml`) runs on every ready pull request and every push to `main`: the generated-file freshness checks, `validate_artifacts.py`, the Cargo checks above and the browser tests not tagged `@db`. The ignored database tests (`cargo test --locked -- --ignored`), the `@db` browser tests and the smoke check need the licensed MMDB and run only where it is available.
+
 | Directory | Contents |
 | --- | --- |
 | `src/` | Rust server, IP validation, database decoding, and response types. |
