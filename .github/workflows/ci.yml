@@ -1,8 +1,8 @@
 # Merge checks (README.md, Development) on every ready pull request, every
 # push to main and owner dispatches.
 #
-# Every job runs on the shared CI pool's self-hosted runners: `ci-light` for
-# the change filter and the generated-file checks, `ci-heavy` for the Rust
+# Every job runs on a fresh one-job CI-SelfHosted runner: `ci-2cpu` for
+# the change filter and the generated-file checks, `ci-4cpu` for the Rust
 # checks and the browser tests. Builds and pinned tools persist between runs
 # under $CI_CACHE_DIR/ip-info, with one Cargo target directory per runner so
 # concurrent runs never share a binary; nothing else is cached. A job-started
@@ -42,15 +42,15 @@ env:
   # Line tables keep file and line in backtraces without full debuginfo.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
-# timeout-minutes includes the runners' job-started hook, which can take several
-# minutes.
+# timeout-minutes keeps the margin it had for the old pool's job-started hook
+# until the CI-SelfHosted reports show the jobs' times there.
 jobs:
   # Checkout makes HEAD the pull request merged into its base, so HEAD^1 is
   # the base and the diff is the request's.
   changes:
     name: changes
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: [self-hosted, ci-light]
+    runs-on: [self-hosted, ci-2cpu]
     timeout-minutes: 15
     outputs:
       code: ${{ steps.diff.outputs.code }}
@@ -79,7 +79,7 @@ jobs:
   artifacts:
     name: artifacts
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: [self-hosted, ci-light]
+    runs-on: [self-hosted, ci-2cpu]
     timeout-minutes: 15
     env:
       # scripts/render_readme.py's only dependency; SHA-256 of the PyPI wheel.
@@ -132,7 +132,7 @@ jobs:
     name: rust
     needs: changes
     if: ${{ !cancelled() && !github.event.pull_request.draft && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
-    runs-on: [self-hosted, ci-heavy]
+    runs-on: [self-hosted, ci-4cpu]
     timeout-minutes: 30
     env:
       NODE_VERSION: 24.21.0
