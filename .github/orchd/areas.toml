@@ -1,0 +1,58 @@
+# Work areas of ip-info for orchd: one open task per area (GLOBAL 3.1). The globs are pairwise
+# disjoint and cover every tracked file. A path that matches no glob counts as area:shared, which
+# conflicts with every area. Check a change with `orchd areas check --repo shifter-io/ip-info`.
+v = 1
+
+[areas]
+# the Rust lookup server: its source, API tests and their JSON fixtures, the stress example, the
+# MMDB source manifest
+server = [
+    "src/**",
+    "tests/api.rs",
+    "tests/example.json",
+    "tests/lite-example.json",
+    "examples/**",
+    "data/**",
+]
+# the public site: page sources, the generated web/ output, the API contract and examples it embeds,
+# its generators and copy checks
+site = [
+    "site/*",
+    "web/**",
+    "scripts/api_contract.py",
+    "scripts/examples.py",
+    "scripts/generate_site.py",
+    "scripts/generate_meta_images.py",
+    "scripts/generate_favicons.js",
+    "scripts/text_checks.py",
+    "scripts/validate_artifacts.py",
+    "tests/browser/site.spec.js",
+]
+# the web-proxy page: its scripts, styles and data, the page embedder and its browser tests
+proxy = [
+    "site/proxy/*",
+    "scripts/proxy_page.py",
+    "tests/browser/proxy.spec.js",
+    "tests/browser/fixtures/**",
+]
+# the country flag images the proxy page shows
+flags = ["site/proxy/flags/**"]
+# the browser-test toolchain: Playwright settings and the npm manifest and lockfile
+browser = ["playwright.config.js", "package.json", "package-lock.json"]
+# documentation: README, licence, the rendered docs/ pages and the README renderer
+docs = ["README.md", "LICENSE", "docs/**", "scripts/render_readme.py"]
+# measurement: benchmark, stress and smoke tools, their report renderers and the artifacts folder
+bench = [
+    "scripts/benchmark.py",
+    "scripts/stress_test.py",
+    "scripts/smoke.py",
+    "scripts/render_stress_report.py",
+    "scripts/render_validation.py",
+    "artifacts/**",
+]
+# packaging and deployment: the container image, compose file, deployment template and environment
+# example
+deploy = ["Dockerfile", ".dockerignore", "compose.yaml", "deploy/**", ".env.example"]
+# workspace-wide: Cargo manifest and lockfile, toolchain, ignore list and CI; a change here merges
+# alone
+shared = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".gitignore", ".github/**"]
