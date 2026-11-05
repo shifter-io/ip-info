@@ -13,6 +13,14 @@
 # A pull request that changes only README.md, LICENSE or docs/ runs only the
 # `artifacts` job. Draft pull requests run nothing until marked ready.
 #
+# `gate` is the one check to require: it always runs, and it passes only when
+# `changes` and `artifacts` succeeded and `rust` succeeded or was skipped for a
+# docs-only pull request. It fails on a draft, where nothing else ran.
+#
+# Each push to main has its own concurrency group, so a later merge never
+# cancels or replaces an earlier commit's run; pull requests share one group
+# per branch and cancel their superseded runs.
+#
 # Not here: the checks that need the licensed MMDB, which CI never fetches:
 # the ignored database tests (`cargo test --locked -- --ignored`), the browser
 # tests tagged @db and scripts/smoke.py.
@@ -26,8 +34,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -187,3 +195,35 @@ jobs:
           done
           curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null
           TEST_BASE_URL="http://127.0.0.1:$port" npm run test:browser -- --grep-invert @db
+
+  # The required check. `if: always()` because a skipped check counts as a
+  # pass; the result is computed from the other jobs instead.
+  gate:
+    name: gate
+    needs: [changes, artifacts, rust]
+    if: always()
+    runs-on: [self-hosted, ci-2cpu]
+    timeout-minutes: 5
+    steps:
+      - env:
+          DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+          CHANGES: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          ARTIFACTS: ${{ needs.artifacts.result }}
+          RUST: ${{ needs.rust.result }}
+        run: |
+          echo "draft=$DRAFT changes=$CHANGES code=$CODE artifacts=$ARTIFACTS rust=$RUST"
+          if [ "$DRAFT" = true ]; then
+            echo "::error::draft pull request: no checks ran; mark it ready for review"
+            exit 1
+          fi
+          fail=0
+          [ "$CHANGES" = success ] || { echo "::error::changes job $CHANGES"; fail=1; }
+          [ "$ARTIFACTS" = success ] || { echo "::error::artifacts job $ARTIFACTS"; fail=1; }
+          if [ "$RUST" = skipped ] && [ "$CHANGES" = success ] && [ "$CODE" = false ]; then
+            echo "rust skipped: docs-only change"
+          elif [ "$RUST" != success ]; then
+            echo "::error::rust job $RUST"
+            fail=1
+          fi
+          exit "$fail"
