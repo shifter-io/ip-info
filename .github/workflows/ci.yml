@@ -205,4 +205,4 @@ jobs:
       - env:
           GITHUB_TOKEN: ${{ github.token }}
           CODE: ${{ steps.diff.outputs.code }}
-        run: python3 .github/ci/gate.py
+        run: python3 -u .github/ci/gate.py

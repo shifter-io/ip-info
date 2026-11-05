@@ -17,9 +17,9 @@ import urllib.request
 REQUIRED = ("changes", "artifacts", "rust")
 POLL_SECONDS = 15
 DEADLINE_SECONDS = 45 * 60
-# How long a failed job of an earlier attempt may stand before the gate takes it as final: a re-run
-# of failed jobs creates their new attempt shortly after the gate's, and a re-run of the gate alone
-# never creates one.
+# How long a job of an earlier attempt, passed or failed, may stand before the gate takes it as
+# final: a re-run creates a job's new attempt only once the jobs it needs have finished again, and a
+# re-run of the gate alone never creates one.
 STALE_SECONDS = 3 * 60
 
 
@@ -27,10 +27,11 @@ def jobs() -> list:
     url = "%s/repos/%s/actions/runs/%s/jobs?filter=all&per_page=100" % (
         os.environ["GITHUB_API_URL"], os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_RUN_ID"])
     request = urllib.request.Request(url, headers={
-        "Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     })
+    # Unredirected: a redirect never carries the token to another host.
+    request.add_unredirected_header("Authorization", "Bearer " + os.environ["GITHUB_TOKEN"])
     with urllib.request.urlopen(request, timeout=30) as response:
         payload = json.load(response)
     listed = payload.get("jobs") or []
@@ -55,8 +56,7 @@ def settled(found: dict, attempt: int, waited: float) -> bool:
         job = found.get(name)
         if job is None or job.get("status") != "completed":
             return False
-        old = (job.get("run_attempt") or 0) < attempt
-        if old and job.get("conclusion") != "success" and waited < STALE_SECONDS:
+        if (job.get("run_attempt") or 0) < attempt and waited < STALE_SECONDS:
             return False
     return True
 
