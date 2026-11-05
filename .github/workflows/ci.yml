@@ -13,9 +13,12 @@
 # A pull request that changes only README.md, LICENSE or docs/ runs only the
 # `artifacts` job. Draft pull requests run nothing until marked ready.
 #
-# `gate` is the one check to require: it always runs, and it passes only when
-# `changes` and `artifacts` succeeded and `rust` succeeded or was skipped for a
-# docs-only pull request. It fails on a draft, where nothing else ran.
+# `gate` is the one check to require. It starts with the other jobs, waits for
+# them by reading this run (.github/ci/gate.py) and passes only when `changes`
+# and `artifacts` succeeded and `rust` succeeded or was skipped for a
+# docs-only pull request. On a draft it is skipped under another name, so a
+# draft run leaves no `gate` result on the commit, neither a pass nor a
+# failure that would outlive the ready run.
 #
 # Each push to main has its own concurrency group, so a later merge never
 # cancels or replaces an earlier commit's run; pull requests share one group
@@ -53,8 +56,6 @@ env:
 # timeout-minutes keeps the margin it had for the old pool's job-started hook
 # until the CI-SelfHosted reports show the jobs' times there.
 jobs:
-  # Checkout makes HEAD the pull request merged into its base, so HEAD^1 is
-  # the base and the diff is the request's.
   changes:
     name: changes
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -68,19 +69,7 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - id: diff
-        env:
-          EVENT: ${{ github.event_name }}
-        run: |
-          if [ "$EVENT" != pull_request ]; then
-            echo code=true | tee -a "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # --no-renames lists a moved file under its old path too.
-          files=$(git diff --name-only --no-renames HEAD^1 HEAD)
-          code=false
-          [ -n "$files" ] || code=true
-          grep -qvE '^(README\.md|LICENSE|docs/.+)$' <<< "$files" && code=true
-          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+        run: bash .github/ci/changes.sh | tee -a "$GITHUB_OUTPUT"
 
   # Generated files, the toolchain pin and the offline artifact checks. Every
   # ready pull request runs this job, a docs-only one nothing else.
@@ -196,34 +185,24 @@ jobs:
           curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null
           TEST_BASE_URL="http://127.0.0.1:$port" npm run test:browser -- --grep-invert @db
 
-  # The required check. `if: always()` because a skipped check counts as a
-  # pass; the result is computed from the other jobs instead.
+  # The required check (header). No `needs`: it starts at once and polls.
   gate:
-    name: gate
-    needs: [changes, artifacts, rust]
-    if: always()
+    name: ${{ github.event.pull_request.draft && 'gate (skipped on drafts)' || 'gate' }}
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: [self-hosted, ci-2cpu]
-    timeout-minutes: 5
+    # rust's 30 and changes' 15 minutes, plus their boots.
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: diff
+        run: bash .github/ci/changes.sh | tee -a "$GITHUB_OUTPUT"
       - env:
-          DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
-          CHANGES: ${{ needs.changes.result }}
-          CODE: ${{ needs.changes.outputs.code }}
-          ARTIFACTS: ${{ needs.artifacts.result }}
-          RUST: ${{ needs.rust.result }}
-        run: |
-          echo "draft=$DRAFT changes=$CHANGES code=$CODE artifacts=$ARTIFACTS rust=$RUST"
-          if [ "$DRAFT" = true ]; then
-            echo "::error::draft pull request: no checks ran; mark it ready for review"
-            exit 1
-          fi
-          fail=0
-          [ "$CHANGES" = success ] || { echo "::error::changes job $CHANGES"; fail=1; }
-          [ "$ARTIFACTS" = success ] || { echo "::error::artifacts job $ARTIFACTS"; fail=1; }
-          if [ "$RUST" = skipped ] && [ "$CHANGES" = success ] && [ "$CODE" = false ]; then
-            echo "rust skipped: docs-only change"
-          elif [ "$RUST" != success ]; then
-            echo "::error::rust job $RUST"
-            fail=1
-          fi
-          exit "$fail"
+          GITHUB_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.diff.outputs.code }}
+        run: python3 .github/ci/gate.py
