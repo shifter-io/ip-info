@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="3" failures="0" errors="0" timestamp="2026-11-07T15:00:00.000+00:00" time="12.500">
+    <testsuite name="ip-info::api" tests="3" disabled="0" errors="0" failures="0">
+        <testcase name="lookup_returns_json" classname="ip-info::api" timestamp="2026-11-07T15:00:00.000+00:00" time="0.012">
+        </testcase>
+        <testcase name="cache::slow_refresh_cycle" classname="ip-info::api" timestamp="2026-11-07T15:00:00.000+00:00" time="12.400">
+        </testcase>
+        <testcase name="rejects_bad_ip" classname="ip-info::api" timestamp="2026-11-07T15:00:00.000+00:00" time="0.003">
+        </testcase>
+    </testsuite>
+</testsuites>
