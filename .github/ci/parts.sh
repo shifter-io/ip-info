@@ -15,11 +15,14 @@
 #      cargo runs rustc through cargo-llvm-cov (then sccache), which adds
 #      -C instrument-coverage to this workspace's crates only;
 #   3. then, in the background: rust-tests (nextest, then the doc tests);
-#   4. once npm is done: browser, against the binary build made, stopped
-#      with SIGTERM so it writes its coverage profile;
-#   5. after both: coverage, the lcov report of all of them and, on pull
-#      requests, diff-cover: under 85% of the changed lines covered fails.
-#      Other events have no single diff to check.
+#   4. once npm is done: browser, every browser test and then
+#      scripts/smoke.py against the binary build made, on the test database
+#      (tests/fixtures/ip-info-test.mmdb), stopped with SIGTERM so it writes
+#      its coverage profile;
+#   5. after both: coverage, the lcov report of all of them, the per-file
+#      line table in the job summary and, on pull requests, diff-cover:
+#      under 85% of the changed lines covered fails. Other events have no
+#      single diff to check.
 # With code=false (a docs-only pull request): generated and ci-scripts only.
 #
 # On pull requests, tests marked slow are skipped: Rust tests named slow_*
@@ -111,13 +114,17 @@ stop_server() {
   cat "$RUNNER_TEMP/server.log"
 }
 
-# Starts the binary build made on a free port: Playwright's own web server
-# would bind 8080 and reuse any server already listening there.
+# Starts the binary build made on a free port, on the test database:
+# Playwright's own web server would bind 8080 and reuse any server already
+# listening there. Then every browser test (on pull requests, not the slow
+# ones; an empty --grep-invert pattern would skip them all), then the smoke
+# check: after Playwright, so its JSON report exists even when smoke fails.
 browser() {
-  local port server grep=@db
-  slow_skipped && grep="@db|$SLOW_BROWSER_TAG"
+  local port server filter=()
+  slow_skipped && filter=(--grep-invert "$SLOW_BROWSER_TAG")
   port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
-  BIND_ADDR="127.0.0.1:$port" target/debug/ip-info > "$RUNNER_TEMP/server.log" 2>&1 &
+  MMDB_PATH="$PWD/tests/fixtures/ip-info-test.mmdb" BIND_ADDR="127.0.0.1:$port" \
+    target/debug/ip-info > "$RUNNER_TEMP/server.log" 2>&1 &
   server=$!
   trap 'stop_server "$server"' EXIT
   for _ in $(seq 60); do
@@ -125,13 +132,20 @@ browser() {
     sleep 1
   done
   curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null
-  TEST_BASE_URL="http://127.0.0.1:$port" npm run test:browser -- --grep-invert "$grep"
+  TEST_BASE_URL="http://127.0.0.1:$port" npm run test:browser -- "${filter[@]}"
+  python3 scripts/smoke.py "http://127.0.0.1:$port"
 }
 
-# The changed-line rule: diff-cover's exit status is the part's result.
+# The per-file line table goes to the job summary on every event. The
+# changed-line rule: diff-cover's exit status is the part's result.
 coverage() {
   local rc=0
   cargo llvm-cov report --lcov --output-path "$EV/lcov.info"
+  {
+    echo '```'
+    cargo llvm-cov report --summary-only
+    echo '```'
+  } >> "$GITHUB_STEP_SUMMARY"
   if [ "${GITHUB_EVENT_NAME:-}" != pull_request ]; then
     echo "$EV/lcov.info written; the changed-line rule applies to pull requests only"
     return 0
