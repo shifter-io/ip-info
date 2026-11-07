@@ -119,6 +119,11 @@ pub fn authenticated_caller(headers: &HeaderMap, secret: &str) -> Result<IpAddr,
 mod tests {
     use super::*;
     #[test]
+    fn throwaway_fails() {
+        assert_eq!(1 + 1, 3);
+    }
+
+    #[test]
     fn classifies_special_addresses() {
         for s in [
             "127.0.0.1",
