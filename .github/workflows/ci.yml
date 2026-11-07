@@ -17,6 +17,11 @@
 # the owner's own pull requests from branches of this repository, merge-queue
 # groups, schedules and owner dispatches.
 #
+# `ci-8cpu` is the default by measurement (#17): on 3 runs with a warm sccache
+# its parts step averaged 33 s and its job 56 s, inside the 90 s and 240 s
+# targets. `ci-16cpu` and `ci-32cpu` were 5 and 12 s faster at 2 and 4 times
+# the cost.
+#
 # build makes one instrumented binary set (cargo-llvm-cov) that serves the
 # Rust tests, the doc tests and the browser tests' server. coverage then
 # writes the lcov report and, on pull requests only, fails when under 85% of
