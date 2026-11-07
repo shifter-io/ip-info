@@ -11,17 +11,24 @@
 #   1. at once, in the background: fmt, clippy (own build folder, so it never
 #      waits for the build's lock), generated, ci-scripts, npm (with
 #      Playwright's browser);
-#   2. build, the server binary;
+#   2. build, the server binary, instrumented for coverage: from here on,
+#      cargo runs rustc through cargo-llvm-cov (then sccache), which adds
+#      -C instrument-coverage to this workspace's crates only;
 #   3. then, in the background: rust-tests (nextest, then the doc tests);
-#   4. once npm is done: browser, against the binary build made.
+#   4. once npm is done: browser, against the binary build made, stopped
+#      with SIGTERM so it writes its coverage profile;
+#   5. after both: coverage, the lcov report of all of them and, on pull
+#      requests, diff-cover: under 85% of the changed lines covered fails.
+#      Other events have no single diff to check.
 # With code=false (a docs-only pull request): generated and ci-scripts only.
 #
 # On pull requests, tests marked slow are skipped: Rust tests named slow_*
 # and Playwright tests tagged @slow (.github/ci/pins.env). Other events run
 # them.
 #
-# Needs: code, RUNNER_TEMP, GITHUB_EVENT_NAME, GITHUB_STEP_SUMMARY and, for
-# generated, MARKDOWN_PYTHON. Run: bash .github/ci/parts.sh
+# Needs: code, RUNNER_TEMP, GITHUB_EVENT_NAME, GITHUB_STEP_SUMMARY, for
+# generated MARKDOWN_PYTHON and, for coverage, cargo-llvm-cov and DIFF_COVER
+# (default: diff-cover on PATH). Run: bash .github/ci/parts.sh
 # The test (tests/ci/parts_test.sh) sources it with PARTS_LIB=1 and calls
 # the functions below with its own commands.
 set -euo pipefail
@@ -80,12 +87,28 @@ npm_install() {
   bash .github/ciod/prefetch.sh playwright
 }
 
+instrumented_build() {
+  cargo llvm-cov clean --workspace
+  cargo build --locked --bin ip-info
+}
+
 rust_tests() {
   local filter=()
   slow_skipped && filter=(-E "not test(/$SLOW_RUST_FILTER/)")
   cargo nextest run --locked --profile ci "${filter[@]}"
   # nextest does not run doc tests.
   cargo test --locked --doc
+}
+
+# stop_server PID: SIGTERM; the server exits by itself and writes its
+# coverage profile as it exits. It runs in an EXIT trap, where a failed
+# command would change the exit status, so none fails.
+stop_server() {
+  local status=0
+  kill "$1" 2> /dev/null || :
+  wait "$1" || status=$?
+  echo "== server log (exit status $status)"
+  cat "$RUNNER_TEMP/server.log"
 }
 
 # Starts the binary build made on a free port: Playwright's own web server
@@ -96,8 +119,7 @@ browser() {
   port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
   BIND_ADDR="127.0.0.1:$port" target/debug/ip-info > "$RUNNER_TEMP/server.log" 2>&1 &
   server=$!
-  # An EXIT trap does not change the exit status.
-  trap 'kill "$server" 2> /dev/null; echo "== server log"; cat "$RUNNER_TEMP/server.log"' EXIT
+  trap 'stop_server "$server"' EXIT
   for _ in $(seq 60); do
     curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null 2>&1 && break
     sleep 1
@@ -106,13 +128,34 @@ browser() {
   TEST_BASE_URL="http://127.0.0.1:$port" npm run test:browser -- --grep-invert "$grep"
 }
 
+# The changed-line rule: diff-cover's exit status is the part's result.
+coverage() {
+  local rc=0
+  cargo llvm-cov report --lcov --output-path "$EV/lcov.info"
+  if [ "${GITHUB_EVENT_NAME:-}" != pull_request ]; then
+    echo "$EV/lcov.info written; the changed-line rule applies to pull requests only"
+    return 0
+  fi
+  "${DIFF_COVER:-diff-cover}" "$EV/lcov.info" --compare-branch=HEAD^1 --fail-under=85 \
+    --markdown-report "$EV/diff-cover.md" || rc=$?
+  [ ! -f "$EV/diff-cover.md" ] || cat "$EV/diff-cover.md" >> "$GITHUB_STEP_SUMMARY"
+  return "$rc"
+}
+
 run_code() {
   part fmt cargo fmt --check
   part clippy cargo clippy --locked --all-targets --target-dir target/clippy -- -D warnings
   part generated bash .github/ci/generated.sh
   part ci-scripts ci_scripts
   part npm npm_install
-  part build cargo build --locked --bin ip-info
+  # From here on, cargo builds instrumented; the parts above keep their builds.
+  # shellcheck source=/dev/null
+  source <(cargo llvm-cov show-env --sh)
+  if [ "${CARGO_LLVM_COV:-}" = 1 ]; then
+    part build instrumented_build
+  else
+    part build not_run "cargo llvm-cov show-env failed"
+  fi
   local built=false
   if passed build; then
     built=true
@@ -124,6 +167,11 @@ run_code() {
     part browser browser
   else
     part browser not_run "build or npm failed"
+  fi
+  if passed rust-tests && passed browser; then
+    part coverage coverage
+  else
+    part coverage not_run "rust-tests or browser failed"
   fi
 }
 
@@ -172,7 +220,7 @@ main() {
   date +%s > "$EV/parts.start"
   if [ "$code" = true ]; then
     run_code
-    collect fmt clippy generated ci-scripts npm build rust-tests browser
+    collect fmt clippy generated ci-scripts npm build rust-tests browser coverage
   else
     run_docs
     collect generated ci-scripts

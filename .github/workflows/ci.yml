@@ -6,15 +6,23 @@
 # One fresh CI-SelfHosted server per run (`ci-8cpu`; a dispatch may pick
 # `ci-16cpu` or `ci-32cpu` with `size`) runs every check at the same time as a
 # part of .github/ci/parts.sh: fmt, clippy, generated, ci-scripts, npm, build,
-# rust-tests and browser. The server is destroyed after the job, so nothing
-# persists between runs: compiled crates come from sccache, and the Playwright
-# browser and the Markdown virtualenv from what the nightly image build
-# installed under $CI_CACHE_DIR/ip-info with .github/ciod/prefetch.sh
-# (installed now when the image lacks them). Builds use the checkout's target/:
+# rust-tests, browser and coverage. The server is destroyed after the job, so
+# nothing persists between runs: compiled crates come from sccache, and the
+# Playwright browser, the Markdown and diff-cover virtualenvs and
+# cargo-llvm-cov from what the nightly image build installed under
+# $CI_CACHE_DIR/ip-info with .github/ciod/prefetch.sh (installed now when the
+# image lacks them). Builds use the checkout's target/:
 # a CARGO_TARGET_DIR naming a per-server folder would enter every sccache key
 # and so never hit. A job-started hook on the servers refuses every job except
 # the owner's own pull requests from branches of this repository, merge-queue
 # groups, schedules and owner dispatches.
+#
+# build makes one instrumented binary set (cargo-llvm-cov) that serves the
+# Rust tests, the doc tests and the browser tests' server. coverage then
+# writes the lcov report and, on pull requests only, fails when under 85% of
+# the Rust lines the request changes are covered (diff-cover against HEAD^1,
+# main); its per-file report goes to the job summary. Merge-queue, scheduled
+# and dispatched runs build the report without the rule: no single diff.
 #
 # On pull requests, tests marked slow are skipped: Rust tests named slow_*
 # and Playwright tests tagged @slow. Every other event runs them. The Timing
@@ -98,12 +106,16 @@ jobs:
             echo "npm_config_cache=$cache/npm"
             echo "PLAYWRIGHT_BROWSERS_PATH=$cache/tools/ms-playwright"
             echo "MARKDOWN_PYTHON=$cache/tools/markdown-$MARKDOWN_VERSION/bin/python"
+            echo "DIFF_COVER=$cache/tools/diff-cover-$DIFF_COVER_VERSION/bin/diff-cover"
           } >> "$GITHUB_ENV"
+          echo "$cache/tools/cargo-llvm-cov-$CARGO_LLVM_COV_VERSION" >> "$GITHUB_PATH"
           df -h "$CI_CACHE_DIR"
           rustup show active-toolchain || rustup toolchain install
+          # Images built before rust-toolchain.toml listed llvm-tools lack it.
+          [[ "$(rustup component list --installed)" == *llvm-tools* ]] || rustup component add llvm-tools-preview
           echo "node $(node --version), npm $(npm --version)"
           [ "$(node --version)" = "v$NODE_VERSION" ] || { echo "::error::expected node v$NODE_VERSION"; exit 1; }
-          bash .github/ciod/prefetch.sh markdown
+          bash .github/ciod/prefetch.sh markdown cargo-llvm-cov diff-cover
       - name: Parts
         id: parts
         run: bash .github/ci/parts.sh
