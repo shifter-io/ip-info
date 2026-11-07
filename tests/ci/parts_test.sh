@@ -28,7 +28,12 @@ chmod +x "$work/bin/"* "$work/tree/target/debug/ip-info"
 export PATH="$work/bin:$PATH" FAKE_LOG="$work/log"
 failures=0
 
-fail() { echo "FAIL: $1"; failures=$((failures + 1)); }
+# The inner runs' output holds workflow commands (::error::, ::group::);
+# broken up, they print as text instead of acting on this job.
+fail() {
+  echo "FAIL: ${1//::/: :}"
+  failures=$((failures + 1))
+}
 
 # run CODE EVENT: runs parts.sh in the scratch tree; sets $status, $out,
 # $summary and $log.
