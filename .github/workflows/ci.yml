@@ -1,32 +1,33 @@
-# Merge checks (README.md, Development) on every ready pull request, every
-# push to main and owner dispatches.
+# Merge checks (README.md, Development): one job, `tier1`, the one check to
+# require. It runs on ready pull requests, on merge-queue groups, every 6 hours
+# on main (slow tests included) and on owner dispatches. A push to main runs
+# nothing: the merge queue tested the merged result before it landed.
 #
-# Every job runs on a fresh one-job CI-SelfHosted runner: `ci-2cpu` for
-# the change filter and the generated-file checks, `ci-4cpu` for the Rust
-# checks and the browser tests. Each server runs one job and is destroyed
-# after it, so nothing persists between runs: compiled crates come from
-# sccache, and the Playwright browser and the Markdown virtualenv from what
-# the nightly image build installed under $CI_CACHE_DIR/ip-info with
-# .github/ciod/prefetch.sh (installed now when the image lacks them). Builds
-# use the checkout's target/: a CARGO_* variable naming a per-server folder
-# would enter every sccache key and so never hit. A job-started
-# hook on the servers refuses every job except the owner's own pull requests
-# from branches of this repository, pushes to main, schedules and owner
-# dispatches.
+# One fresh CI-SelfHosted server per run (`ci-8cpu`; a dispatch may pick
+# `ci-16cpu` or `ci-32cpu` with `size`) runs every check at the same time as a
+# part of .github/ci/parts.sh: fmt, clippy, generated, ci-scripts, npm, build,
+# rust-tests and browser. The server is destroyed after the job, so nothing
+# persists between runs: compiled crates come from sccache, and the Playwright
+# browser and the Markdown virtualenv from what the nightly image build
+# installed under $CI_CACHE_DIR/ip-info with .github/ciod/prefetch.sh
+# (installed now when the image lacks them). Builds use the checkout's target/:
+# a CARGO_TARGET_DIR naming a per-server folder would enter every sccache key
+# and so never hit. A job-started hook on the servers refuses every job except
+# the owner's own pull requests from branches of this repository, merge-queue
+# groups, schedules and owner dispatches.
 #
-# A pull request that changes only README.md, LICENSE or docs/ runs only the
-# `artifacts` job. Draft pull requests run nothing until marked ready.
+# On pull requests, tests marked slow are skipped: Rust tests named slow_*
+# and Playwright tests tagged @slow. Every other event runs them.
 #
-# `gate` is the one check to require. It starts with the other jobs, waits for
-# them by reading this run (.github/ci/gate.py) and passes only when `changes`
-# and `artifacts` succeeded and `rust` succeeded or was skipped for a
-# docs-only pull request. On a draft it is skipped under another name, so a
-# draft run leaves no `gate` result on the commit, neither a pass nor a
-# failure that would outlive the ready run.
+# A pull request that changes only README.md, LICENSE or docs/
+# (.github/ci/changes.sh) runs only the generated and ci-scripts parts, and
+# still reports `tier1`. A draft runs nothing: its job is named
+# `tier1 (skipped on drafts)`, so it leaves no `tier1` result on the commit;
+# marking it ready runs `tier1`.
 #
-# Each push to main has its own concurrency group, so a later merge never
-# cancels or replaces an earlier commit's run; pull requests share one group
-# per branch and cancel their superseded runs.
+# A pull request keeps one run per branch and cancels the one it replaces;
+# merge-queue, scheduled and dispatched runs never cancel each other. A red
+# scheduled run opens one issue (.github/ci/report-red.sh).
 #
 # Not here: the checks that need the licensed MMDB, which CI never fetches:
 # the ignored database tests (`cargo test --locked -- --ignored`), the browser
@@ -36,12 +37,20 @@ name: ci
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [main]
+  merge_group:
+    types: [checks_requested]
+  schedule:
+    - cron: "0 */6 * * *"   # full run on main, slow tests included
   workflow_dispatch:
+    inputs:
+      size:
+        description: CI server size
+        type: choice
+        options: [ci-8cpu, ci-16cpu, ci-32cpu]
+        default: ci-8cpu
 
 concurrency:
-  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -56,144 +65,70 @@ env:
   CARGO_INCREMENTAL: 0
   # Line tables keep file and line in backtraces without full debuginfo.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  NODE_VERSION: 24.21.0
+  npm_config_audit: 'false'
+  npm_config_fund: 'false'
+  npm_config_update_notifier: 'false'
 
-# timeout-minutes keeps the margin it had for the old pool's job-started hook
-# until the CI-SelfHosted reports show the jobs' times there.
 jobs:
-  changes:
-    name: changes
+  tier1:
+    name: ${{ github.event.pull_request.draft && 'tier1 (skipped on drafts)' || 'tier1' }}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: [self-hosted, ci-2cpu]
+    runs-on: [self-hosted, "${{ inputs.size || 'ci-8cpu' }}"]
     timeout-minutes: 15
-    outputs:
-      code: ${{ steps.diff.outputs.code }}
     steps:
+      # For a pull request: the request merged into main, so HEAD^1 is main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
-      - id: diff
-        run: bash .github/ci/changes.sh | tee -a "$GITHUB_OUTPUT"
-
-  # Generated files, the toolchain pin and the offline artifact checks. Every
-  # ready pull request runs this job, a docs-only one nothing else.
-  artifacts:
-    name: artifacts
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: [self-hosted, ci-2cpu]
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: The Docker build uses the pinned Rust release
+      - name: Changed files
         run: |
-          channel=$(sed -n 's/^channel = "\([0-9.]*\)"$/\1/p' rust-toolchain.toml)
-          minor=${channel%.*}
-          echo "rust-toolchain.toml: ${channel:-missing}; $(grep -m1 '^FROM rust:' Dockerfile)"
-          # The image may name the release (rust:1.94.1-...) or its line (rust:1.94-...).
-          if [ -z "$channel" ] || ! grep -qE "^FROM rust:(${channel//./\\.}|${minor//./\\.})-" Dockerfile; then
-            echo "::error::the Dockerfile's Rust image must use rust-toolchain.toml's release"
-            exit 1
-          fi
-      # scripts/generate_site.py formats the Rust it writes with rustfmt.
-      - name: Install toolchain from rust-toolchain.toml
-        run: rustup show active-toolchain || rustup toolchain install
-      - name: Markdown for scripts/render_readme.py
-        run: |
-          : "${CI_CACHE_DIR:?is not set; this job needs the self-hosted CI runners}"
-          bash .github/ciod/prefetch.sh markdown
-          . .github/ci/pins.env
-          echo "MARKDOWN_PYTHON=$CI_CACHE_DIR/ip-info/tools/markdown-$MARKDOWN_VERSION/bin/python" >> "$GITHUB_ENV"
-      - name: Generated files are fresh
-        run: |
-          python3 --version
-          python3 scripts/generate_site.py
-          "$MARKDOWN_PYTHON" scripts/render_readme.py
-          git status --short
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "::error::regenerate with scripts/generate_site.py and scripts/render_readme.py and commit the result"
-            exit 1
-          fi
-      - run: python3 scripts/validate_artifacts.py
-
-  # The Rust checks, then the browser tests against the binary the tests built.
-  rust:
-    name: rust
-    needs: changes
-    if: ${{ !cancelled() && !github.event.pull_request.draft && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
-    runs-on: [self-hosted, ci-4cpu]
-    timeout-minutes: 30
-    env:
-      NODE_VERSION: 24.21.0
-      npm_config_audit: 'false'
-      npm_config_fund: 'false'
-      npm_config_update_notifier: 'false'
-    steps:
-      - name: The changes job must have succeeded
-        if: needs.changes.result != 'success'
-        env:
-          RESULT: ${{ needs.changes.result }}
-        run: echo "::error::changes job $RESULT" && exit 1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Use the runner's cache
+          bash .github/ci/changes.sh | tee -a "$GITHUB_ENV"
+      - name: Tools
         run: |
           : "${CI_CACHE_DIR:?is not set; this job needs the self-hosted CI runners}"
           cache="$CI_CACHE_DIR/ip-info"
+          . .github/ci/pins.env
           {
             echo "npm_config_cache=$cache/npm"
             echo "PLAYWRIGHT_BROWSERS_PATH=$cache/tools/ms-playwright"
+            echo "MARKDOWN_PYTHON=$cache/tools/markdown-$MARKDOWN_VERSION/bin/python"
           } >> "$GITHUB_ENV"
           df -h "$CI_CACHE_DIR"
-      - name: Install toolchain from rust-toolchain.toml
-        run: rustup show active-toolchain || rustup toolchain install
-      - run: cargo fmt --check
-      - run: cargo clippy --locked --all-targets -- -D warnings
-      # Also builds the server binary the browser tests start.
-      - run: cargo test --locked
-      - name: Node from the runner
-        run: |
+          rustup show active-toolchain || rustup toolchain install
           echo "node $(node --version), npm $(npm --version)"
           [ "$(node --version)" = "v$NODE_VERSION" ] || { echo "::error::expected node v$NODE_VERSION"; exit 1; }
-      - run: npm ci
-      - name: Playwright's headless shell
-        run: bash .github/ciod/prefetch.sh playwright
-      # A free port and TEST_BASE_URL: Playwright's own web server would bind
-      # 8080 and reuse any server already listening there.
-      - name: Browser tests without the database
-        run: |
-          cargo build --locked
-          port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
-          BIND_ADDR="127.0.0.1:$port" target/debug/ip-info > "$RUNNER_TEMP/server.log" 2>&1 &
-          server=$!
-          trap 'kill "$server" 2> /dev/null || true; cat "$RUNNER_TEMP/server.log"' EXIT
-          for _ in $(seq 60); do
-            curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null 2>&1 && break
-            sleep 1
-          done
-          curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null
-          TEST_BASE_URL="http://127.0.0.1:$port" npm run test:browser -- --grep-invert @db
+          bash .github/ciod/prefetch.sh markdown
+      - name: Parts
+        run: bash .github/ci/parts.sh
+      - name: Browser results and logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: tier1-logs
+          path: |
+            artifacts/browser
+            ${{ runner.temp }}/server.log
+            ${{ runner.temp }}/parts
+          if-no-files-found: ignore
+          retention-days: 14
 
-  # The required check (header). No `needs`: it starts at once and polls.
-  gate:
-    name: ${{ github.event.pull_request.draft && 'gate (skipped on drafts)' || 'gate' }}
-    if: ${{ !github.event.pull_request.draft }}
-    runs-on: [self-hosted, ci-2cpu]
-    # rust's 30 and changes' 15 minutes, plus their boots.
-    timeout-minutes: 50
+  # Scheduled runs only: a dispatched run's result is read by whoever started it.
+  report:
+    needs: tier1
+    if: always() && github.event_name == 'schedule' && needs.tier1.result != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
-      actions: read
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
           persist-credentials: false
-      - id: diff
-        run: bash .github/ci/changes.sh | tee -a "$GITHUB_OUTPUT"
-      - env:
-          GITHUB_TOKEN: ${{ github.token }}
-          CODE: ${{ steps.diff.outputs.code }}
-        run: python3 -u .github/ci/gate.py
+          sparse-checkout: .github/ci
+      - name: Open an issue unless one is open
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/ci/report-red.sh "Scheduled full CI run failed on main"

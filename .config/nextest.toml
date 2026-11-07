@@ -1,0 +1,11 @@
+# cargo-nextest settings. CI (.github/ci/parts.sh) runs `--profile ci`.
+[profile.ci]
+# Run every test, never retry one: a flaky test gets its own issue.
+fail-fast = false
+retries = 0
+# Reported as slow after 60 s; a test that slow is named slow_* (README.md, Development).
+slow-timeout = { period = "60s" }
+
+[profile.ci.junit]
+# Written to target/nextest/ci/junit.xml.
+path = "junit.xml"
