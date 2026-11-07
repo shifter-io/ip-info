@@ -28,6 +28,8 @@ test('every page keeps clean search metadata and loads crawlable icons',async({p
   }
 });
 test('desktop lookup, examples, metadata and navigation',async({page})=>{
+  // Headless Chromium rejects clipboard writes unless the page may write.
+  await page.context().grantPermissions(['clipboard-read','clipboard-write']);
   await page.goto('/');
   await expect(page).toHaveTitle('Free IP Geolocation & ASN API — No API Key | IP Info');
   await expect(page.getByRole('heading',{level:1})).toContainText('Free IP geolocation');
