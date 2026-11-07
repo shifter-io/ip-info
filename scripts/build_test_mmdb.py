@@ -64,7 +64,7 @@ CLOUDFLARE = {
 }
 QUAD9 = {
     'country': place('Switzerland', 2658434, iso_code='CH'),
-    'traits': {'autonomous_system_number': 19282, 'autonomous_system_organization': 'Quad9'},
+    'traits': {'autonomous_system_number': 19281, 'autonomous_system_organization': 'Quad9'},
 }
 
 def networks(google_v4=GOOGLE_V4):
