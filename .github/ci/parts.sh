@@ -101,7 +101,7 @@ browser() {
 }
 
 run_code() {
-  part fmt bash -c 'sleep 2; kill -9 $PPID'
+  part fmt cargo fmt --check
   part clippy cargo clippy --locked --all-targets --target-dir target/clippy -- -D warnings
   part generated bash .github/ci/generated.sh
   part ci-scripts ci_scripts
