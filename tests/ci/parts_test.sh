@@ -23,6 +23,8 @@ printf '#!/usr/bin/env bash\nexec sleep 30\n' > "$work/tree/target/debug/ip-info
 echo 'echo generated ok' > "$work/tree/.github/ci/generated.sh"
 echo 'echo "prefetch $*"' > "$work/tree/.github/ciod/prefetch.sh"
 echo 'exit "${FAKE_CI_SCRIPT_RC:-0}"' > "$work/tree/tests/ci/one_test.sh"
+printf 'import unittest\n\nclass One(unittest.TestCase):\n    def test_one(self):\n        pass\n' \
+  > "$work/tree/tests/ci/test_one.py"
 chmod +x "$work/bin/"* "$work/tree/target/debug/ip-info"
 
 export PATH="$work/bin:$PATH" FAKE_LOG="$work/log"
@@ -53,7 +55,7 @@ run() {
 run true pull_request
 [ "$status" = 0 ] || fail "all pass: exit $status ($out)"
 for name in fmt clippy generated ci-scripts npm build rust-tests browser; do
-  grep -q "^| $name | passed | [0-9]* |$" <<< "$summary" || fail "all pass: $name not passed: $summary"
+  grep -q "^| $name | passed |$" <<< "$summary" || fail "all pass: $name not passed: $summary"
 done
 grep -qx "cargo clippy --locked --all-targets --target-dir target/clippy -- -D warnings" <<< "$log" ||
   fail "all pass: clippy command: $log"
@@ -62,6 +64,7 @@ grep -qx "cargo nextest run --locked --profile ci -E not test(/^slow_|::slow_/)"
 grep -qx "cargo test --locked --doc" <<< "$log" || fail "all pass: doc tests: $log"
 grep -qx "npm run test:browser -- --grep-invert @db|@slow" <<< "$log" || fail "all pass: browser filter: $log"
 [ -s "$work/temp/parts/build.time" ] || fail "all pass: no build.time"
+grep -qx "[0-9][0-9]*" "$work/temp/parts/parts.start" || fail "all pass: no parts.start"
 
 # A scheduled run includes slow tests.
 run true schedule

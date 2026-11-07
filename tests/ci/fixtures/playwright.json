@@ -1,0 +1,33 @@
+{
+  "config": {"version": "1.58.2"},
+  "suites": [
+    {
+      "title": "pages.spec.js",
+      "file": "pages.spec.js",
+      "specs": [
+        {
+          "title": "home page loads",
+          "file": "pages.spec.js",
+          "tags": [],
+          "tests": [{"projectName": "", "status": "expected", "results": [{"status": "passed", "duration": 1500}]}]
+        }
+      ],
+      "suites": [
+        {
+          "title": "lookup",
+          "file": "pages.spec.js",
+          "specs": [
+            {
+              "title": "full table renders",
+              "file": "pages.spec.js",
+              "tags": ["slow"],
+              "tests": [{"projectName": "", "status": "expected", "results": [{"status": "passed", "duration": 4200}]}]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {"expected": 2, "unexpected": 0, "flaky": 0, "skipped": 0}
+}
