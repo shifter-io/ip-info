@@ -5,9 +5,10 @@
 #
 # One fresh CI-SelfHosted server per run (`ci-8cpu`; a dispatch may pick
 # `ci-2cpu`, `ci-4cpu`, `ci-16cpu` or `ci-32cpu` with `size`) runs every
-# check at the same time as a part of .github/ci/parts.sh: fmt, clippy, generated, ci-scripts, npm, build,
-# rust-tests, browser and coverage. The server is destroyed after the job, so
-# nothing persists between runs: compiled crates come from sccache, and the
+# check at the same time as a part of .github/ci/parts.sh: fmt, clippy,
+# generated, ci-scripts, npm, build, rust-tests, browser and coverage. The
+# server is destroyed after the job, so nothing persists between runs:
+# compiled crates come from sccache, and the
 # Playwright browser, the Markdown and diff-cover virtualenvs and
 # cargo-llvm-cov from what the nightly image build installed under
 # $CI_CACHE_DIR/ip-info with .github/ciod/prefetch.sh (installed now when the
@@ -20,7 +21,10 @@
 # `ci-8cpu` is the default by measurement (#17): on 3 runs with a warm sccache
 # its parts step averaged 33 s and its job 56 s, inside the 90 s and 240 s
 # targets. `ci-16cpu` and `ci-32cpu` were 5 and 12 s faster at 2 and 4 times
-# the cost.
+# the cost. `ci-2cpu` and `ci-4cpu` (#32) also met both targets (parts step
+# 71 and 45 s, job 96 and 70 s) at 40% and 77% of the cost, but their servers
+# boot about 40 and 55 s slower, so feedback (server wait plus job) averaged
+# 222 and 213 s against 122 s on `ci-8cpu`: more than the 30 s allowed.
 #
 # build makes one instrumented binary set (cargo-llvm-cov) that serves the
 # Rust tests, the doc tests and the browser tests' server. coverage then
