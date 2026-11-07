@@ -24,9 +24,10 @@
 #
 # build makes one instrumented binary set (cargo-llvm-cov) that serves the
 # Rust tests, the doc tests and the browser tests' server. coverage then
-# writes the lcov report and, on pull requests only, fails when under 85% of
+# writes the lcov report, adds the per-file line table to the job summary
+# and, on pull requests only, fails when under 85% of
 # the Rust lines the request changes are covered (diff-cover against HEAD^1,
-# main); its per-file report goes to the job summary. Merge-queue, scheduled
+# main); diff-cover's report goes to the job summary too. Merge-queue, scheduled
 # and dispatched runs build the report without the rule: no single diff.
 #
 # On pull requests, tests marked slow are skipped: Rust tests named slow_*
@@ -46,9 +47,8 @@
 # merge-queue, scheduled and dispatched runs never cancel each other. A red
 # scheduled run opens one issue (.github/ci/report-red.sh).
 #
-# Not here: the checks that need the licensed MMDB, which CI never fetches:
-# the ignored database tests (`cargo test --locked -- --ignored`), the browser
-# tests tagged @db and scripts/smoke.py.
+# The Rust database tests, every browser test and scripts/smoke.py run on the
+# test database (tests/fixtures/*.mmdb, scripts/build_test_mmdb.py).
 name: ci
 
 on:

@@ -16,6 +16,7 @@ __pycache__/
 .env.*
 !.env.example
 *.mmdb
+!/tests/fixtures/*.mmdb
 *.mmdb.*
 
 # Local Bunny account credentials
