@@ -165,3 +165,4 @@ test('approved country artwork animates with the SDK blocked and respects reduce
   expect(await orbit.evaluate(el=>getComputedStyle(el).animationName)).toBe('none');
   await expect(page.locator('.orbit-flag')).toHaveCount(12);
 });
+test('throwaway fails',async()=>{expect(1).toBe(2);});
