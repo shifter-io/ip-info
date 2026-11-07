@@ -4,8 +4,8 @@
 # nothing: the merge queue tested the merged result before it landed.
 #
 # One fresh CI-SelfHosted server per run (`ci-8cpu`; a dispatch may pick
-# `ci-16cpu` or `ci-32cpu` with `size`) runs every check at the same time as a
-# part of .github/ci/parts.sh: fmt, clippy, generated, ci-scripts, npm, build,
+# `ci-2cpu`, `ci-4cpu`, `ci-16cpu` or `ci-32cpu` with `size`) runs every
+# check at the same time as a part of .github/ci/parts.sh: fmt, clippy, generated, ci-scripts, npm, build,
 # rust-tests, browser and coverage. The server is destroyed after the job, so
 # nothing persists between runs: compiled crates come from sccache, and the
 # Playwright browser, the Markdown and diff-cover virtualenvs and
@@ -63,7 +63,7 @@ on:
       size:
         description: CI server size
         type: choice
-        options: [ci-8cpu, ci-16cpu, ci-32cpu]
+        options: [ci-2cpu, ci-4cpu, ci-8cpu, ci-16cpu, ci-32cpu]
         default: ci-8cpu
 
 concurrency:
