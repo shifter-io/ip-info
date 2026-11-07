@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prints code=true when the run must build and test, code=false for a pull
-# request that changes only README.md, LICENSE or docs/. The `changes` job
-# and `gate` both run it, so they cannot disagree on a docs-only change.
+# request that changes only README.md, LICENSE or docs/. The `tier1` job
+# (.github/workflows/ci.yml) adds it to its environment.
 #
 # Checkout makes HEAD the pull request merged into its base, so HEAD^1 is the
 # base and the diff is the request's; it needs fetch-depth 2.
