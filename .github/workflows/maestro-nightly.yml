@@ -1,0 +1,72 @@
+# Maestro nightly: known-vulnerable dependencies. A failure becomes an issue; it never blocks PRs.
+# maestro-init writes this file only when it is missing: once a project adapts it, it is the project's.
+# The full test suite runs nightly through the project's own CI workflow (`schedule:` trigger).
+#
+# Adapted for Rust: a pinned cargo-audit release binary (nothing compiles, so a
+# small runner is enough), and a red scheduled run opens one issue through
+# .github/ci/report-red.sh.
+name: maestro-nightly
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  # rustsec/rustsec release asset cargo-audit-x86_64-unknown-linux-musl-v<version>.tgz.
+  CARGO_AUDIT_VERSION: 0.22.2
+  CARGO_AUDIT_SHA256: 7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428
+jobs:
+  audit:
+    runs-on: [self-hosted, ci-8cpu]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Pinned cargo-audit
+        run: |
+          : "${CI_CACHE_DIR:?is not set; this job needs the self-hosted CI runners}"
+          tools="$CI_CACHE_DIR/ip-info/tools"
+          dest="$tools/cargo-audit-$CARGO_AUDIT_VERSION"
+          mkdir -p "$tools"
+          # Unpacked next to its final place, marked complete, then renamed in one step.
+          if [ ! -f "$dest/.complete" ]; then
+            tmp=$(mktemp -d "$tools/.tmp.XXXXXX")
+            trap 'rm -rf "$tmp"' EXIT
+            asset="cargo-audit-x86_64-unknown-linux-musl-v$CARGO_AUDIT_VERSION"
+            curl -fsSL --retry 3 -o "$tmp/a.tgz" \
+              "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv$CARGO_AUDIT_VERSION/$asset.tgz"
+            echo "$CARGO_AUDIT_SHA256  $tmp/a.tgz" | sha256sum -c --quiet -
+            mkdir "$tmp/x"
+            tar -C "$tmp/x" --strip-components=1 -xzf "$tmp/a.tgz"
+            touch "$tmp/x/.complete"
+            # A concurrent run may have placed it first; then its copy is used.
+            mv -T "$tmp/x" "$dest" 2> /dev/null || true
+          fi
+          echo "$dest" >> "$GITHUB_PATH"
+      - name: Dependency audit
+        run: |
+          cargo-audit --version
+          cargo-audit audit
+  # Scheduled runs only: a dispatched run's result is read by whoever started it.
+  report:
+    needs: audit
+    if: always() && github.event_name == 'schedule' && needs.audit.result != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/ci
+      - name: Open an issue unless one is open
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/ci/report-red.sh "Nightly dependency audit failed"

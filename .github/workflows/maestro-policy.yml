@@ -1,0 +1,25 @@
+# Maestro: PR size, privacy and AI attribution (required check `maestro-policy`).
+# Runs on GitHub's runner: it needs only git and Python and starts in seconds.
+name: maestro-policy
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  maestro-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Size, privacy, attribution
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          printf '%s' "$BODY" > "$RUNNER_TEMP/body.txt"
+          python3 .github/maestro/policy.py --base "$BASE" --head HEAD --pr-body-file "$RUNNER_TEMP/body.txt"
