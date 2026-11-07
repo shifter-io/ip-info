@@ -318,12 +318,29 @@ Database integration checks require the licensed local MMDB. Browser checks use 
 
 Browser tests that need the database are tagged `@db`; without it, run `npm run test:browser -- --grep-invert @db`. After editing this README, refresh `docs/readme.html` with `python3 scripts/render_readme.py` (requires Markdown). `rust-toolchain.toml` pins the Rust release that CI and the Docker build use.
 
-Continuous integration (`.github/workflows/ci.yml`) is one job, `tier1`, on one fresh CI server per run. It runs every check at the same time as a part of `.github/ci/parts.sh`: `fmt` (`cargo fmt --check`), `clippy` (in its own build folder, `target/clippy`), `generated` (the Docker image's Rust release matches `rust-toolchain.toml`, generated files are fresh, `validate_artifacts.py`; in its own copy of the tree), `ci-scripts` (every `tests/ci/*.sh` and the `tests/ci/test_*.py` unit tests), `npm` (`npm ci` and Playwright's browser), `build` (the server binary), then `rust-tests` (`cargo nextest run --profile ci`, then `cargo test --doc`) and `browser` (the browser tests not tagged `@db`, against the binary `build` made). Any failed part fails the run, and the job summary lists each part's result. It runs on ready pull requests, on merge-queue groups, every 6 hours on `main` and on dispatch; a push to `main` runs nothing, because the merge queue tested the merged result first. A red scheduled run opens an issue.
+Continuous integration (`.github/workflows/ci.yml`) is one job, `tier1`, on one fresh CI server per run. It runs every check at the same time as a part of `.github/ci/parts.sh`: `fmt` (`cargo fmt --check`), `clippy` (in its own build folder, `target/clippy`), `generated` (the Docker image's Rust release matches `rust-toolchain.toml`, generated files are fresh, `validate_artifacts.py`; in its own copy of the tree), `ci-scripts` (every `tests/ci/*.sh` and the `tests/ci/test_*.py` unit tests), `npm` (`npm ci` and Playwright's browser), `build` (the server binary, instrumented for coverage), then `rust-tests` (`cargo nextest run --profile ci`, then `cargo test --doc`) and `browser` (the browser tests not tagged `@db`, against the binary `build` made), then `coverage`. Any failed part fails the run, and the job summary lists each part's result. It runs on ready pull requests, on merge-queue groups, every 6 hours on `main` and on dispatch; a push to `main` runs nothing, because the merge queue tested the merged result first. A red scheduled run opens an issue.
 
 - **Slow tests:** a test that takes over 60 seconds is marked slow: a Rust test named `slow_*`, a browser test tagged `@slow`. Pull requests skip them; merge-queue, scheduled and dispatched runs include them. `.github/ci/pins.env` holds both patterns.
 - **Timing:** after the parts, even red ones, `.github/ci/timing.py` adds each part's start, end and time, the parts step's time against its 90-second target and the 10 slowest tests to the job summary. It fails `tier1` when a test not marked slow took over 60 seconds on a pull request, any test took 90 seconds or more, the parts step took over 240 seconds, or a test report is missing.
+- **Changed-line coverage:** one instrumented build ([cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)) serves the Rust tests, the doc tests and the server the browser tests use, which is stopped with SIGTERM so it writes its coverage profile. On pull requests, `coverage` fails when under 85% of the Rust lines the request changes are covered by all of them together ([diff-cover](https://github.com/Bachmann1234/diff_cover) against `main`), and puts the uncovered lines of each file in the job summary. Merge-queue, scheduled and dispatched runs write the report without the rule. `.github/ci/pins.env` pins both tools; `.github/ci/coverage-requirements.txt` pins diff-cover's packages with hashes.
 - **Docs-only pull requests:** when only `README.md`, `LICENSE` or `docs/` changed (`.github/ci/changes.sh`), `tier1` runs only `generated` and `ci-scripts`, and its summary names the rule.
-- **Licensed MMDB:** CI never fetches it, so the ignored database tests (`cargo test --locked -- --ignored`), the `@db` browser tests and the smoke check run only where it is available.
+- **Licensed MMDB:** CI never fetches it, so the ignored database tests (`cargo test --locked -- --ignored`), the `@db` browser tests and the smoke check run only where it is available. The 85% rule covers database code too, but the lines that run only with the licensed MMDB (`Database::open` and `Database::lookup`) cannot be covered in CI yet: a pull request that changes only those lines waits for the small fake database file that a planned task adds, built by a script with no licensed data.
+
+To run the coverage check locally, install `cargo-llvm-cov` and `diff-cover` at the versions in `.github/ci/pins.env` (`rustup` adds `llvm-tools-preview` from `rust-toolchain.toml`), then:
+
+```sh
+source <(cargo llvm-cov show-env --sh)
+cargo llvm-cov clean --workspace
+cargo build --locked --bin ip-info
+cargo test --locked
+# Optional, to count the browser tests too: start target/debug/ip-info, run
+# TEST_BASE_URL=http://127.0.0.1:8080 npm run test:browser -- --grep-invert @db,
+# then stop the server with kill (SIGTERM) so it writes its profile.
+cargo llvm-cov report --lcov --output-path lcov.info
+diff-cover lcov.info --compare-branch=origin/main --fail-under=85
+```
+
+Run them in a new shell: `show-env` changes how `cargo` builds in the shell that sources it.
 
 | Directory | Contents |
 | --- | --- |

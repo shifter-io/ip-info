@@ -6,8 +6,9 @@
 # The nightly CI image build runs it with no argument from a fresh clone of
 # main after `npm ci --ignore-scripts`, as a user that may write only
 # $CI_CACHE_DIR/ip-info, with HOME=$CI_CACHE_DIR/ip-info. ci.yml runs it
-# with one tool's name as the fallback for images built without it.
-#   prefetch.sh [playwright] [markdown]
+# with the names of the tools it needs as the fallback for images built
+# without them.
+#   prefetch.sh [playwright] [markdown] [cargo-llvm-cov] [diff-cover]
 set -euo pipefail
 : "${CI_CACHE_DIR:?is not set}"
 # shellcheck source-path=SCRIPTDIR source=../ci/pins.env
@@ -27,27 +28,62 @@ playwright() {
   echo "playwright: $state ${dir:-under $PLAYWRIGHT_BROWSERS_PATH}"
 }
 
-# A virtual environment cannot move, so it is built in place and marked complete.
-markdown() {
-  local dir="$tools/markdown-$MARKDOWN_VERSION" req
+# venv NAME DIR REQUIREMENTS: a virtual environment cannot move, so it is
+# built in place from hash-pinned wheels and marked complete.
+venv() {
+  local name=$1 dir=$2 req=$3
   if [ -f "$dir/.complete" ]; then
-    echo "markdown: prefetched $dir"
+    echo "$name: prefetched $dir"
     return
   fi
   rm -rf "$dir"
   python3 -m venv "$dir"
-  req=$(mktemp)
-  echo "markdown==$MARKDOWN_VERSION --hash=sha256:$MARKDOWN_SHA256" > "$req"
   "$dir/bin/pip" install --quiet --no-cache-dir --disable-pip-version-check --require-hashes --only-binary :all: -r "$req"
-  rm -f "$req"
   touch "$dir/.complete"
-  echo "markdown: installed now $dir"
+  echo "$name: installed now $dir"
 }
 
-[ "$#" -gt 0 ] || set -- playwright markdown
+markdown() {
+  local req
+  req=$(mktemp)
+  echo "markdown==$MARKDOWN_VERSION --hash=sha256:$MARKDOWN_SHA256" > "$req"
+  venv markdown "$tools/markdown-$MARKDOWN_VERSION" "$req"
+  rm -f "$req"
+}
+
+diff_cover() {
+  local req
+  req="$(dirname "$0")/../ci/coverage-requirements.txt"
+  if ! grep -qx "diff-cover==$DIFF_COVER_VERSION \\\\" "$req"; then
+    echo "prefetch.sh: $req does not pin diff-cover $DIFF_COVER_VERSION (pins.env)" >&2
+    return 1
+  fi
+  venv diff-cover "$tools/diff-cover-$DIFF_COVER_VERSION" "$req"
+}
+
+# One binary from the release asset, checked against its pinned SHA-256.
+cargo_llvm_cov() {
+  local dir="$tools/cargo-llvm-cov-$CARGO_LLVM_COV_VERSION" asset
+  if [ -f "$dir/.complete" ]; then
+    echo "cargo-llvm-cov: prefetched $dir"
+    return
+  fi
+  rm -rf "$dir"
+  mkdir -p "$dir"
+  asset="$dir/asset.tar.gz"
+  curl -fsSL --retry 3 -o "$asset" \
+    "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v$CARGO_LLVM_COV_VERSION/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz"
+  echo "$CARGO_LLVM_COV_SHA256  $asset" | sha256sum --check --quiet
+  tar -xzf "$asset" -C "$dir" cargo-llvm-cov
+  rm -f "$asset"
+  touch "$dir/.complete"
+  echo "cargo-llvm-cov: installed now $dir"
+}
+
+[ "$#" -gt 0 ] || set -- playwright markdown cargo-llvm-cov diff-cover
 for tool in "$@"; do
   case "$tool" in
-    playwright | markdown) "$tool" ;;
+    playwright | markdown | cargo-llvm-cov | diff-cover) "${tool//-/_}" ;;
     *) echo "prefetch.sh: unknown tool '$tool'" >&2; exit 2 ;;
   esac
 done
