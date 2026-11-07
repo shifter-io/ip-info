@@ -1,0 +1,37 @@
+# Maestro queue gate: on each merge-queue test, report maestro/review, maestro/qa and maestro-policy
+# for the group, after confirming they passed on the PR's own head (they had to, to enter the queue).
+# Nothing is re-reviewed. Runs on GitHub's runner: it only reads statuses and starts in seconds.
+name: maestro-queue
+on:
+  merge_group:
+permissions:
+  contents: read
+  statuses: read
+  checks: read
+  pull-requests: read
+jobs:
+  gate:
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        check: [maestro/review, maestro/qa, maestro-policy]
+    steps:
+      - name: The PR passed ${{ matrix.check }} on its own head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          CHECK: ${{ matrix.check }}
+        run: |
+          pr=$(printf '%s' "$HEAD_REF" | sed -nE 's#.*/pr-([0-9]+)-[0-9a-f]+$#\1#p')
+          [ -n "$pr" ] || { echo "no PR number in $HEAD_REF"; exit 1; }
+          sha=$(gh api "repos/$REPO/pulls/$pr" --jq .head.sha)
+          if [ "$CHECK" = maestro-policy ]; then
+            state=$(gh api "repos/$REPO/commits/$sha/check-runs?check_name=$CHECK" --jq '[.check_runs[].conclusion][0] // "missing"')
+          else
+            state=$(gh api "repos/$REPO/commits/$sha/statuses" --jq "[.[] | select(.context == \"$CHECK\") | .state][0] // \"missing\"")
+          fi
+          echo "PR #$pr at ${sha:0:7}: $CHECK = $state"
+          [ "$state" = success ]
