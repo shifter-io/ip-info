@@ -68,3 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     connections.abort_all();
     Ok(())
 }
+
+fn throwaway() -> u32 {
+    "x"
+}
