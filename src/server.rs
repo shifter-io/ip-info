@@ -1,6 +1,6 @@
 use crate::{
     database::{Database, LookupLiteResponse},
-    network,
+    network, site,
 };
 use axum::{
     Json, Router,
@@ -139,6 +139,13 @@ pub fn error(status: StatusCode, code: &str, message: &str) -> Response {
 fn bad(message: &str) -> Response {
     error(StatusCode::BAD_REQUEST, "invalid_ip", message)
 }
+fn unavailable(message: &str) -> Response {
+    error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "database_unavailable",
+        message,
+    )
+}
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Params {
@@ -146,7 +153,24 @@ struct Params {
 }
 
 pub fn app(state: Arc<AppState>) -> Router {
-    let api = Router::new()
+    // API routes merge without its fallback, keeping unknown website pages as HTML 404s.
+    site::routes()
+        .route(
+            "/healthz",
+            get(|| async { pretty_json(json!({"status":"ok"})) })
+                .layer(middleware::from_fn(api_headers)),
+        )
+        .route(
+            "/readyz",
+            get(ready).layer(middleware::from_fn(api_headers)),
+        )
+        .merge(api_routes())
+        .fallback(|| async { (StatusCode::NOT_FOUND, Html(include_str!("../web/404.html"))) })
+        .layer(middleware::from_fn_with_state(state.clone(), common))
+        .with_state(state)
+}
+fn api_routes() -> Router<Arc<AppState>> {
+    Router::new()
         .route("/myip", get(my_ip))
         .route("/json", get(lookup_self::<false>))
         .route("/{ip}/json", get(lookup_path::<false>))
@@ -164,252 +188,13 @@ pub fn app(state: Arc<AppState>) -> Router {
             axum::http::Method::HEAD,
             axum::http::Method::OPTIONS,
         ]))
-        .layer(middleware::from_fn(api_headers));
-    // API routes merge without its fallback, keeping unknown website pages as HTML 404s.
-    Router::new()
-        .route(
-            "/",
-            get(|| async { Html(include_str!("../web/index.html")) }),
-        )
-        .route(
-            "/web-proxy",
-            get(|| async { Html(include_str!("../web/web-proxy.html")) }),
-        )
-        .route(
-            "/docs",
-            get(|| async { Html(include_str!("../web/docs.html")) }),
-        )
-        .route(
-            "/ai",
-            get(|| async { Html(include_str!("../web/ai.html")) }),
-        )
-        .route(
-            "/about",
-            get(|| async { Html(include_str!("../web/about.html")) }),
-        )
-        .route(
-            "/terms",
-            get(|| async { Html(include_str!("../web/terms.html")) }),
-        )
-        .route(
-            "/privacy",
-            get(|| async { Html(include_str!("../web/privacy.html")) }),
-        )
-        .route(
-            "/cookies",
-            get(|| async { Html(include_str!("../web/cookies.html")) }),
-        )
-        .route(
-            "/llms.txt",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                    include_str!("../web/llms.txt"),
-                )
-            }),
-        )
-        .route(
-            "/llms-full.txt",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                    include_str!("../web/llms-full.txt"),
-                )
-            }),
-        )
-        .route(
-            "/openapi.json",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "application/json")],
-                    include_str!("../web/openapi.json"),
-                )
-            }),
-        )
-        .route(
-            "/sitemap.xml",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "application/xml")],
-                    include_str!("../web/sitemap.xml"),
-                )
-            }),
-        )
-        .route("/robots.txt", get(robots))
-        .route(
-            "/share.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/share.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/meta/home.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/meta/home.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/meta/web-proxy.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/meta/web-proxy.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/meta/docs.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/meta/docs.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/meta/ai.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/meta/ai.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/meta/about.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/meta/about.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/meta/terms.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/meta/terms.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/meta/privacy.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/meta/privacy.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/meta/cookies.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/meta/cookies.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/favicon.ico",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/x-icon")],
-                    &include_bytes!("../web/favicon.ico")[..],
-                )
-            }),
-        )
-        .route(
-            "/favicon.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/favicon.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/favicon.svg",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/svg+xml")],
-                    include_str!("../web/favicon.svg"),
-                )
-            }),
-        )
-        .route(
-            "/apple-touch-icon.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/apple-touch-icon.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/android-chrome-192x192.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/android-chrome-192x192.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/android-chrome-512x512.png",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "image/png")],
-                    &include_bytes!("../web/android-chrome-512x512.png")[..],
-                )
-            }),
-        )
-        .route(
-            "/site.webmanifest",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "application/manifest+json")],
-                    &include_bytes!("../web/site.webmanifest")[..],
-                )
-            }),
-        )
-        .route(
-            "/healthz",
-            get(|| async { pretty_json(json!({"status":"ok"})) })
-                .layer(middleware::from_fn(api_headers)),
-        )
-        .route(
-            "/readyz",
-            get(ready).layer(middleware::from_fn(api_headers)),
-        )
-        .merge(api)
-        .fallback(|| async { (StatusCode::NOT_FOUND, Html(include_str!("../web/404.html"))) })
-        .layer(middleware::from_fn_with_state(state.clone(), common))
-        .with_state(state)
-}
-async fn robots(State(s): State<Arc<AppState>>) -> String {
-    if s.config.indexable {
-        "User-agent: *\nAllow: /\nSitemap: https://ip-info.com/sitemap.xml\n".into()
-    } else {
-        "User-agent: *\nDisallow: /\n".into()
-    }
+        .layer(middleware::from_fn(api_headers))
 }
 async fn ready(State(s): State<Arc<AppState>>) -> Response {
     if s.healthy.load(Ordering::Relaxed) {
         pretty_json(json!({"status":"ready"}))
     } else {
-        error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "database_unavailable",
-            "Database is not ready.",
-        )
+        unavailable("Database is not ready.")
     }
 }
 async fn api_headers(req: Request, next: Next) -> Response {
@@ -420,76 +205,79 @@ async fn api_headers(req: Request, next: Next) -> Response {
         .insert("x-robots-tag", HeaderValue::from_static("noindex"));
     r
 }
+/// Every response: the header size check, the trailing-slash redirect, a
+/// 10 s timeout, the page rewrite, then the security and robots headers.
 async fn common(State(s): State<Arc<AppState>>, req: Request, next: Next) -> Response {
-    let size = req.uri().to_string().len()
-        + req
-            .headers()
-            .iter()
-            .map(|(k, v)| k.as_str().len() + v.len())
-            .sum::<usize>();
-    let path = req.uri().path();
-    let normalized_path = path.trim_end_matches('/');
-    let api_path = normalized_path == "/myip"
-        || normalized_path.ends_with("/json")
-        || normalized_path.ends_with("/json_lite")
-        || normalized_path == "/healthz"
-        || normalized_path == "/readyz";
-    let mut response = if size > 16384 {
+    let api_path = is_api_path(req.uri().path());
+    let response = if oversized(&req) {
         error(
             StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
             "request_too_large",
             "Request headers are too large.",
         )
-    } else if path.len() > 1 && path.ends_with('/') {
-        let target = format!(
-            "{}{}",
-            path.trim_end_matches('/'),
-            req.uri()
-                .query()
-                .map(|q| format!("?{q}"))
-                .unwrap_or_default()
-        );
-        if target.starts_with("//") {
-            bad("Invalid request path.")
-        } else {
-            (StatusCode::PERMANENT_REDIRECT, [(header::LOCATION, target)]).into_response()
-        }
+    } else if let Some(redirect) = trailing_slash_redirect(&req) {
+        redirect
     } else {
         tokio::time::timeout(Duration::from_secs(10), next.run(req))
             .await
             .unwrap_or_else(|_| error(StatusCode::GATEWAY_TIMEOUT, "timeout", "Request timed out."))
     };
+    let mut response = rewrite_page(response, &s.config).await;
+    finish(&mut response, api_path, s.config.indexable);
+    response
+}
+fn is_api_path(path: &str) -> bool {
+    let path = path.trim_end_matches('/');
+    path == "/myip"
+        || path.ends_with("/json")
+        || path.ends_with("/json_lite")
+        || path == "/healthz"
+        || path == "/readyz"
+}
+fn oversized(req: &Request) -> bool {
+    let headers = req
+        .headers()
+        .iter()
+        .map(|(k, v)| k.as_str().len() + v.len());
+    req.uri().to_string().len() + headers.sum::<usize>() > 16384
+}
+fn trailing_slash_redirect(req: &Request) -> Option<Response> {
+    let path = req.uri().path();
+    if path.len() <= 1 || !path.ends_with('/') {
+        return None;
+    }
+    let query = req.uri().query().map(|q| format!("?{q}"));
+    let trimmed = path.trim_end_matches('/');
+    let target = format!("{trimmed}{}", query.unwrap_or_default());
+    Some(if target.starts_with("//") {
+        bad("Invalid request path.")
+    } else {
+        (StatusCode::PERMANENT_REDIRECT, [(header::LOCATION, target)]).into_response()
+    })
+}
+async fn rewrite_page(response: Response, config: &Config) -> Response {
     let html = response
         .headers()
         .get(header::CONTENT_TYPE)
         .and_then(|h| h.to_str().ok())
         .is_some_and(|s| s.starts_with("text/html"));
-    if html {
-        let (mut parts, body) = response.into_parts();
-        if let Ok(bytes) = axum::body::to_bytes(body, 2_000_000).await {
-            let mut text = String::from_utf8_lossy(&bytes).replace("__GA4_ID__", &s.config.ga4_id);
-            for (file, route) in [
-                ("index.html", "/"),
-                ("docs.html", "/docs"),
-                ("web-proxy.html", "/web-proxy"),
-                ("ai.html", "/ai"),
-                ("about.html", "/about"),
-                ("terms.html", "/terms"),
-                ("privacy.html", "/privacy"),
-                ("cookies.html", "/cookies"),
-            ] {
-                text = text.replace(&format!("href=\"{file}"), &format!("href=\"{route}"));
-            }
-            parts.headers.remove(header::CONTENT_LENGTH);
-            response = Response::from_parts(parts, Body::from(text));
-        } else {
-            response = error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
-                "Unable to serve this page.",
-            );
-        }
+    if !html {
+        return response;
     }
+    let (mut parts, body) = response.into_parts();
+    let Ok(bytes) = axum::body::to_bytes(body, 2_000_000).await else {
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "Unable to serve this page.",
+        );
+    };
+    let text = site::rewrite_html(&String::from_utf8_lossy(&bytes), &config.ga4_id);
+    parts.headers.remove(header::CONTENT_LENGTH);
+    Response::from_parts(parts, Body::from(text))
+}
+fn finish(response: &mut Response, api_path: bool, indexable: bool) {
+    let not_found = response.status() == StatusCode::NOT_FOUND;
     let h = response.headers_mut();
     h.insert(
         "x-content-type-options",
@@ -501,17 +289,12 @@ async fn common(State(s): State<Arc<AppState>>, req: Request, next: Next) -> Res
         "permissions-policy",
         HeaderValue::from_static("geolocation=(), camera=(), microphone=()"),
     );
-    if api_path || !s.config.indexable || response.status() == StatusCode::NOT_FOUND {
-        response
-            .headers_mut()
-            .insert("x-robots-tag", HeaderValue::from_static("noindex"));
+    if api_path || !indexable || not_found {
+        h.insert("x-robots-tag", HeaderValue::from_static("noindex"));
     }
     if api_path {
-        response
-            .headers_mut()
-            .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     }
-    response
 }
 type ParsedParams = Result<Query<Params>, axum::extract::rejection::QueryRejection>;
 fn caller_ip(
@@ -588,19 +371,9 @@ fn lookup<const LITE: bool>(
     if !network::public(ip) {
         return bad("Only public unicast IPv4 and IPv6 addresses are supported.");
     }
-    if !s.healthy.load(Ordering::Relaxed) {
-        return error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "database_unavailable",
-            "Database is not ready.",
-        );
-    }
-    let Some(db) = s.db.as_ref() else {
-        return error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "database_unavailable",
-            "Database is not ready.",
-        );
+    let healthy = s.healthy.load(Ordering::Relaxed);
+    let Some(db) = s.db.as_ref().filter(|_| healthy) else {
+        return unavailable("Database is not ready.");
     };
     match db.lookup(ip) {
         Ok(Some(record)) => {
@@ -618,11 +391,7 @@ fn lookup<const LITE: bool>(
         Err(_) => {
             s.healthy.store(false, Ordering::Relaxed);
             eprintln!("Database lookup failed; readiness disabled");
-            error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "database_unavailable",
-                "Database could not be read.",
-            )
+            unavailable("Database could not be read.")
         }
     }
 }
