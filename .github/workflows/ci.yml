@@ -3,9 +3,13 @@
 #
 # Every job runs on a fresh one-job CI-SelfHosted runner: `ci-2cpu` for
 # the change filter and the generated-file checks, `ci-4cpu` for the Rust
-# checks and the browser tests. Builds and pinned tools persist between runs
-# under $CI_CACHE_DIR/ip-info, with one Cargo target directory per runner so
-# concurrent runs never share a binary; nothing else is cached. A job-started
+# checks and the browser tests. Each server runs one job and is destroyed
+# after it, so nothing persists between runs: compiled crates come from
+# sccache, and the Playwright browser and the Markdown virtualenv from what
+# the nightly image build installed under $CI_CACHE_DIR/ip-info with
+# .github/ciod/prefetch.sh (installed now when the image lacks them). Builds
+# use the checkout's target/: a CARGO_* variable naming a per-server folder
+# would enter every sccache key and so never hit. A job-started
 # hook on the servers refuses every job except the owner's own pull requests
 # from branches of this repository, pushes to main, schedules and owner
 # dispatches.
@@ -78,10 +82,6 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: [self-hosted, ci-2cpu]
     timeout-minutes: 15
-    env:
-      # scripts/render_readme.py's only dependency; SHA-256 of the PyPI wheel.
-      MARKDOWN_VERSION: 3.11.2
-      MARKDOWN_SHA256: f80390747a2a0ff2ba54da074ce4f862f72a6685f608cd2637b646a6d83993f5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -102,16 +102,9 @@ jobs:
       - name: Markdown for scripts/render_readme.py
         run: |
           : "${CI_CACHE_DIR:?is not set; this job needs the self-hosted CI runners}"
-          dir="$CI_CACHE_DIR/ip-info/tools/markdown-$MARKDOWN_VERSION"
-          # A virtual environment cannot move, so it is built in place and marked complete.
-          if [ ! -f "$dir/.complete" ]; then
-            rm -rf "$dir"
-            python3 -m venv "$dir"
-            echo "markdown==$MARKDOWN_VERSION --hash=sha256:$MARKDOWN_SHA256" > "$RUNNER_TEMP/requirements.txt"
-            "$dir/bin/pip" install --quiet --disable-pip-version-check --require-hashes --only-binary :all: -r "$RUNNER_TEMP/requirements.txt"
-            touch "$dir/.complete"
-          fi
-          echo "MARKDOWN_PYTHON=$dir/bin/python" >> "$GITHUB_ENV"
+          bash .github/ciod/prefetch.sh markdown
+          . .github/ci/pins.env
+          echo "MARKDOWN_PYTHON=$CI_CACHE_DIR/ip-info/tools/markdown-$MARKDOWN_VERSION/bin/python" >> "$GITHUB_ENV"
       - name: Generated files are fresh
         run: |
           python3 --version
@@ -150,7 +143,6 @@ jobs:
           : "${CI_CACHE_DIR:?is not set; this job needs the self-hosted CI runners}"
           cache="$CI_CACHE_DIR/ip-info"
           {
-            echo "CARGO_TARGET_DIR=$cache/target/rust-$RUNNER_NAME"
             echo "npm_config_cache=$cache/npm"
             echo "PLAYWRIGHT_BROWSERS_PATH=$cache/tools/ms-playwright"
           } >> "$GITHUB_ENV"
@@ -166,16 +158,15 @@ jobs:
           echo "node $(node --version), npm $(npm --version)"
           [ "$(node --version)" = "v$NODE_VERSION" ] || { echo "::error::expected node v$NODE_VERSION"; exit 1; }
       - run: npm ci
-      # package-lock.json pins Playwright and so the browser build. Headless
-      # runs need only the headless shell; no --with-deps (no sudo here).
-      - run: npx playwright install --only-shell chromium
+      - name: Playwright's headless shell
+        run: bash .github/ciod/prefetch.sh playwright
       # A free port and TEST_BASE_URL: Playwright's own web server would bind
       # 8080 and reuse any server already listening there.
       - name: Browser tests without the database
         run: |
           cargo build --locked
           port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
-          BIND_ADDR="127.0.0.1:$port" "$CARGO_TARGET_DIR/debug/ip-info" > "$RUNNER_TEMP/server.log" 2>&1 &
+          BIND_ADDR="127.0.0.1:$port" target/debug/ip-info > "$RUNNER_TEMP/server.log" 2>&1 &
           server=$!
           trap 'kill "$server" 2> /dev/null || true; cat "$RUNNER_TEMP/server.log"' EXIT
           for _ in $(seq 60); do
