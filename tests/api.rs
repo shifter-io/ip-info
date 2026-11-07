@@ -1,64 +1,12 @@
-use axum::{
-    Router,
-    body::Body,
-    http::{Request, StatusCode},
-};
-use http_body_util::BodyExt;
-use ip_info::{AppState, Config, Peer, app};
-use serde_json::Value;
-use std::sync::{Arc, OnceLock};
-use tower::ServiceExt;
+mod common;
 
-async fn call(
-    router: Router,
-    url: &str,
-    method: &str,
-    headers: &[(&str, &str)],
-) -> (StatusCode, axum::http::HeaderMap, Value) {
-    let (status, headers, bytes) = call_raw(router, url, method, headers).await;
-    (
-        status,
-        headers,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
-}
-async fn call_raw(
-    router: Router,
-    url: &str,
-    method: &str,
-    headers: &[(&str, &str)],
-) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
-    let mut request = Request::builder().method(method).uri(url);
-    for (key, value) in headers {
-        request = request.header(*key, *value);
-    }
-    let response = router
-        .oneshot(request.body(Body::empty()).unwrap())
-        .await
-        .unwrap();
-    let status = response.status();
-    let headers = response.headers().clone();
-    let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    (status, headers, bytes.to_vec())
-}
+use axum::{Router, http::StatusCode};
+use common::{call, call_raw};
+use ip_info::{AppState, Config, Peer, app};
+use std::sync::Arc;
+
 fn missing() -> Router {
     app(Arc::new(AppState::load("/no-such-mmdb", Config::default())))
-}
-fn real() -> Router {
-    static STATE: OnceLock<Arc<AppState>> = OnceLock::new();
-    app(STATE
-        .get_or_init(|| {
-            let state = AppState::load(
-                &std::env::var("MMDB_PATH").unwrap_or_else(|_| "data/dbip.mmdb".into()),
-                Config::default(),
-            );
-            assert!(
-                state.db.is_some(),
-                "Real database tests require MMDB_PATH or data/dbip.mmdb"
-            );
-            Arc::new(state)
-        })
-        .clone())
 }
 #[tokio::test]
 async fn production_favicons_are_crawlable_without_a_database() {
@@ -342,61 +290,6 @@ async fn lite_headers_cors_redirects_and_missing_caller() {
 }
 
 #[tokio::test]
-#[ignore = "requires the private DB-IP MMDB"]
-async fn real_lite_lookup_matches_full_location_for_all_lookup_modes() {
-    let schema: Value = serde_json::from_str(include_str!("../web/openapi.json")).unwrap();
-    let fields = schema["components"]["schemas"]["IpInfoLite"]["properties"]
-        .as_object()
-        .unwrap();
-    assert_eq!(fields.len(), 4);
-    for ip in [
-        "8.8.8.8",
-        "1.1.1.1",
-        "2001:4860:4860::8888",
-        "::ffff:8.8.8.8",
-    ] {
-        let (status, _, full) = call(real(), &format!("/json?ip={ip}"), "GET", &[]).await;
-        assert_eq!(status, StatusCode::OK);
-        let expected = serde_json::json!({
-            "country_code": full["country"], "region": full["region"],
-            "city": full["city"], "timezone": full["timezone"]
-        });
-        let router = real().layer(axum::Extension(Peer(ip.parse().unwrap())));
-        for path in [
-            "/json_lite".to_string(),
-            format!("/json_lite?ip={ip}"),
-            format!("/{ip}/json_lite"),
-            format!("/{ip}/json_lite?ip={ip}"),
-        ] {
-            let (status, headers, bytes) = call_raw(
-                router.clone(),
-                &path,
-                "GET",
-                &[
-                    ("origin", "https://example.com"),
-                    ("x-forwarded-for", "9.9.9.9"),
-                    ("cdn-real-ip", "9.9.9.9"),
-                ],
-            )
-            .await;
-            assert_eq!(status, StatusCode::OK, "{path}");
-            assert_eq!(headers["content-type"], "application/json");
-            assert_eq!(headers["cache-control"], "no-store");
-            assert_eq!(headers["x-robots-tag"], "noindex");
-            assert_eq!(headers["access-control-allow-origin"], "*");
-            let actual: Value = serde_json::from_slice(&bytes).unwrap();
-            assert_eq!(actual, expected, "{path}");
-            assert!(fields.keys().all(|name| actual.get(name).is_some()));
-            assert!(!bytes.contains(&b'\n'), "Lite JSON must be compact");
-            assert!(bytes.len() < serde_json::to_vec(&full).unwrap().len());
-            let (status, headers, bytes) = call_raw(router.clone(), &path, "HEAD", &[]).await;
-            assert_eq!(status, StatusCode::OK);
-            assert_eq!(headers["content-type"], "application/json");
-            assert!(bytes.is_empty());
-        }
-    }
-}
-#[tokio::test]
 async fn proxy_page_and_brand_assets_are_embedded_without_a_database() {
     let router = app(Arc::new(AppState::load(
         "/no-such-mmdb",
@@ -463,109 +356,4 @@ async fn cors_and_site_routes() {
     )
     .await;
     assert_eq!(s, StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE);
-}
-#[tokio::test]
-#[ignore = "requires the private DB-IP MMDB"]
-async fn real_database_matches_contract() {
-    let (s, h, actual) = call(real(), "/json?ip=8.8.8.8", "GET", &[]).await;
-    assert_eq!(s, StatusCode::OK);
-    assert_eq!(h["cache-control"], "no-store");
-    assert!(actual.get("database_date").is_none());
-    let (ready_status, _, readiness) = call(real(), "/readyz", "GET", &[]).await;
-    assert_eq!(ready_status, StatusCode::OK);
-    assert_eq!(readiness, serde_json::json!({"status":"ready"}));
-    let schema: Value = serde_json::from_str(include_str!("../web/openapi.json")).unwrap();
-    let fields = schema["components"]["schemas"]["IpInfo"]["properties"]
-        .as_object()
-        .unwrap();
-    assert_eq!(actual.as_object().unwrap().len(), fields.len());
-    for field in fields.keys() {
-        assert!(actual.get(field).is_some(), "{field}");
-    }
-    let path = call(real(), "/8.8.8.8/json", "GET", &[]).await.2;
-    assert_eq!(actual, path);
-    let matching = call(real(), "/8.8.8.8/json?ip=8.8.8.8", "GET", &[]).await.2;
-    assert_eq!(actual, matching);
-    let mapped = call(real(), "/json?ip=::ffff:8.8.8.8", "GET", &[]).await.2;
-    assert_eq!(actual, mapped);
-    let (status, _, ipv6) = call(real(), "/json?ip=2001:4860:4860::8888", "GET", &[]).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(ipv6["asn"], 15169);
-}
-#[tokio::test]
-#[ignore = "requires the private DB-IP MMDB"]
-async fn caller_spoofing_and_cache_isolation() {
-    let one = real().layer(axum::Extension(Peer("8.8.8.8".parse().unwrap())));
-    let two = real().layer(axum::Extension(Peer("9.9.9.9".parse().unwrap())));
-    let a = call(
-        one,
-        "/json",
-        "GET",
-        &[("x-forwarded-for", "1.1.1.1"), ("cdn-real-ip", "1.1.1.1")],
-    )
-    .await
-    .2;
-    let b = call(two, "/json", "GET", &[]).await.2;
-    assert_eq!(a["ip"], "8.8.8.8");
-    assert_eq!(b["ip"], "9.9.9.9");
-    let config = Config {
-        trusted_proxies: vec!["10.0.0.0/24".parse().unwrap()],
-        ..Config::default()
-    };
-    let trusted = app(Arc::new(AppState::load("data/dbip.mmdb", config)))
-        .layer(axum::Extension(Peer("10.0.0.1".parse().unwrap())));
-    let a = call(
-        trusted.clone(),
-        "/json",
-        "GET",
-        &[("x-forwarded-for", "1.1.1.1, 8.8.8.8, 10.0.0.2")],
-    )
-    .await;
-    assert_eq!(a.0, StatusCode::OK);
-    assert_eq!(a.2["ip"], "8.8.8.8");
-    assert_eq!(
-        call(trusted, "/json", "GET", &[]).await.0,
-        StatusCode::BAD_REQUEST
-    );
-}
-
-#[tokio::test]
-#[ignore = "requires the private DB-IP MMDB"]
-async fn authenticated_ingress_rejects_spoofed_headers() {
-    let config = Config {
-        ingress_secret: "a".repeat(64),
-        ..Config::default()
-    };
-    let router = app(Arc::new(AppState::load("data/dbip.mmdb", config)))
-        .layer(axum::Extension(Peer("10.0.0.2".parse().unwrap())));
-    for headers in [
-        vec![],
-        vec![
-            ("x-ip-info-client-ip", "1.1.1.1"),
-            ("x-ip-info-ingress", "wrong"),
-        ],
-    ] {
-        assert_eq!(
-            call(router.clone(), "/json", "GET", &headers).await.0,
-            StatusCode::BAD_REQUEST
-        );
-    }
-    let secret = "a".repeat(64);
-    let valid = [
-        ("x-ip-info-ingress", secret.as_str()),
-        ("x-ip-info-client-ip", "8.8.8.8"),
-        ("x-forwarded-for", "1.1.1.1"),
-    ];
-    let (status, _, json) = call(router.clone(), "/json", "GET", &valid).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["ip"], "8.8.8.8");
-    let duplicate = [
-        ("x-ip-info-ingress", secret.as_str()),
-        ("x-ip-info-ingress", secret.as_str()),
-        ("x-ip-info-client-ip", "8.8.8.8"),
-    ];
-    assert_eq!(
-        call(router, "/json", "GET", &duplicate).await.0,
-        StatusCode::BAD_REQUEST
-    );
 }

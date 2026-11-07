@@ -9,6 +9,6 @@ module.exports = defineConfig({
     screenshot:'only-on-failure', trace:'retain-on-failure'},
   webServer: process.env.TEST_BASE_URL ? undefined : {
     command: 'cargo run --locked', url:'http://127.0.0.1:8080/healthz', reuseExistingServer:true,
-    timeout:120000, env:{BIND_ADDR:'127.0.0.1:8080'}
+    timeout:120000, env:{BIND_ADDR:'127.0.0.1:8080', MMDB_PATH: process.env.MMDB_PATH || 'tests/fixtures/ip-info-test.mmdb'}
   }
 });

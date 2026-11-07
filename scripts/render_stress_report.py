@@ -24,7 +24,7 @@ page=f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewpo
 <h2>Reproduce locally</h2><pre>cargo build --release --locked --offline
 cargo build --release --example stress --locked --offline
 cargo test --locked --offline
-cargo test --locked --offline -- --ignored
+MMDB_PATH=data/dbip.mmdb cargo test --locked --offline
 python3 scripts/stress_test.py
 python3 scripts/render_stress_report.py</pre><p>The runner starts its own server, samples resources, performs the scenarios, and stops the server. Port 18080 must be free. Raw data: <a href="../artifacts/stress/results.json">results.json</a>. Load generator: <a href="../examples/stress.rs">stress.rs</a>. Runner: <a href="../scripts/stress_test.py">stress_test.py</a>.</p></html>'''
 (root/'docs/stress-test.html').write_text(page)

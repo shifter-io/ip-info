@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Tests .github/ci/parts.sh in a scratch tree with fake cargo, npm, curl and
-# diff-cover first on PATH. They log their arguments to $FAKE_LOG, and cargo
-# adds " (instrumented)" once `cargo llvm-cov show-env` set its variables;
-# cargo and npm fail when "<tool> <subcommand>" equals $FAKE_FAIL.
+# diff-cover first on PATH, and a fake server and scripts/smoke.py in the
+# tree. They log their arguments to $FAKE_LOG (the server its MMDB_PATH and
+# BIND_ADDR), and cargo adds " (instrumented)" once `cargo llvm-cov show-env`
+# set its variables; cargo and npm fail when "<tool> <subcommand>" equals
+# $FAKE_FAIL, and smoke exits with $FAKE_SMOKE_RC.
 # Run: bash tests/ci/parts_test.sh
 set -euo pipefail
 # From a shell that sourced `cargo llvm-cov show-env`: the fakes decide.
@@ -13,7 +15,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 mkdir -p "$work/bin" "$work/tree/.github/ci" "$work/tree/.github/ciod" \
-  "$work/tree/tests/ci" "$work/tree/target/debug"
+  "$work/tree/tests/ci" "$work/tree/target/debug" "$work/tree/scripts"
 cat > "$work/bin/npm" <<'FAKE'
 #!/usr/bin/env bash
 printf '%s\n' "npm $*" >> "$FAKE_LOG"
@@ -33,7 +35,17 @@ echo "fake diff-cover report" > "${*: -1}"
 exit "${FAKE_DIFF_COVER_RC:-0}"
 FAKE
 printf '#!/usr/bin/env bash\nexit 0\n' > "$work/bin/curl"
-printf '#!/usr/bin/env bash\nexec sleep 30\n' > "$work/tree/target/debug/ip-info"
+cat > "$work/tree/target/debug/ip-info" <<'FAKE'
+#!/usr/bin/env bash
+printf '%s\n' "server MMDB_PATH=$MMDB_PATH BIND_ADDR=$BIND_ADDR" >> "$FAKE_LOG"
+exec sleep 30
+FAKE
+cat > "$work/tree/scripts/smoke.py" <<'FAKE'
+import os, sys
+with open(os.environ['FAKE_LOG'], 'a') as log:
+    log.write(' '.join(['smoke', *sys.argv[1:]]) + '\n')
+sys.exit(int(os.environ.get('FAKE_SMOKE_RC', '0')))
+FAKE
 echo 'echo generated ok' > "$work/tree/.github/ci/generated.sh"
 echo 'echo "prefetch $*"' > "$work/tree/.github/ciod/prefetch.sh"
 echo 'exit "${FAKE_CI_SCRIPT_RC:-0}"' > "$work/tree/tests/ci/one_test.sh"
@@ -66,8 +78,9 @@ run() {
 }
 
 # A pull request where every part passes: slow tests are filtered out, the
-# build and the tests run instrumented, clippy and fmt do not, and the
-# changed-line report is in the summary.
+# build and the tests run instrumented, clippy and fmt do not, the server runs
+# on the test database, smoke runs after Playwright against the server, and
+# the per-file table and the changed-line report are in the summary.
 run true pull_request
 [ "$status" = 0 ] || fail "all pass: exit $status ($out)"
 for name in fmt clippy generated ci-scripts npm build rust-tests browser coverage; do
@@ -78,14 +91,23 @@ grep -qx "cargo clippy --locked --all-targets --target-dir target/clippy -- -D w
 grep -qx "cargo fmt --check" <<< "$log" || fail "all pass: fmt command: $log"
 for line in "llvm-cov clean --workspace" "build --locked --bin ip-info" \
   "nextest run --locked --profile ci -E not test(/^slow_|::slow_/)" "test --locked --doc" \
-  "llvm-cov report --lcov --output-path $work/temp/parts/lcov.info"; do
+  "llvm-cov report --lcov --output-path $work/temp/parts/lcov.info" "llvm-cov report --summary-only"; do
   grep -qxF "cargo $line (instrumented)" <<< "$log" || fail "all pass: not instrumented: $line: $log"
 done
 grep -qxF "diff-cover $work/temp/parts/lcov.info --compare-branch=HEAD^1 --fail-under=85 --markdown-report $work/temp/parts/diff-cover.md" <<< "$log" ||
   fail "all pass: diff-cover command: $log"
 grep -qx "fake diff-cover report" <<< "$summary" || fail "all pass: no coverage report: $summary"
 grep -q "^== server log (exit status [0-9]*)$" <<< "$out" || fail "all pass: server not stopped: $out"
-grep -qx "npm run test:browser -- --grep-invert @db|@slow" <<< "$log" || fail "all pass: browser filter: $log"
+grep -qx "npm run test:browser -- --grep-invert @slow" <<< "$log" || fail "all pass: browser filter: $log"
+grep -qx "server MMDB_PATH=$work/tree/tests/fixtures/ip-info-test.mmdb BIND_ADDR=127.0.0.1:[0-9]*" <<< "$log" ||
+  fail "all pass: server database: $log"
+port=$(sed -n 's/^server .* BIND_ADDR=127.0.0.1:\([0-9]*\)$/\1/p' <<< "$log")
+# Other parts log at the same time: compare line numbers, not neighbours.
+playwright_at=$(grep -n '^npm run test:browser' <<< "$log" | cut -d: -f1)
+smoke_at=$(grep -nx "smoke http://127.0.0.1:$port" <<< "$log" | cut -d: -f1)
+[ -n "$port" ] && [ -n "$smoke_at" ] && [ "$smoke_at" -gt "${playwright_at:-0}" ] ||
+  fail "all pass: smoke not after Playwright on the server's URL: $log"
+[ "$(grep -c '^```$' <<< "$summary")" = 2 ] || fail "all pass: no per-file table: $summary"
 [ -s "$work/temp/parts/build.time" ] || fail "all pass: no build.time"
 grep -qx "[0-9][0-9]*" "$work/temp/parts/parts.start" || fail "all pass: no parts.start"
 
@@ -93,10 +115,12 @@ grep -qx "[0-9][0-9]*" "$work/temp/parts/parts.start" || fail "all pass: no part
 run true schedule
 [ "$status" = 0 ] || fail "schedule: exit $status ($out)"
 grep -qx "cargo nextest run --locked --profile ci (instrumented)" <<< "$log" || fail "schedule: nextest command: $log"
-grep -qx "npm run test:browser -- --grep-invert @db" <<< "$log" || fail "schedule: browser filter: $log"
+grep -qx "npm run test:browser --" <<< "$log" || fail "schedule: browser filter: $log"
+grep -q "^smoke " <<< "$log" || fail "schedule: no smoke: $log"
 # No pull-request diff: the lcov report only, no changed-line rule.
 grep -q "^| coverage | passed |" <<< "$summary" || fail "schedule: coverage row: $summary"
-grep -q "llvm-cov report" <<< "$log" || fail "schedule: no lcov report: $log"
+grep -q "llvm-cov report --lcov" <<< "$log" || fail "schedule: no lcov report: $log"
+grep -q "llvm-cov report --summary-only" <<< "$log" || fail "schedule: no per-file table: $log"
 grep -q "^diff-cover" <<< "$log" && fail "schedule: diff-cover ran: $log"
 
 # Under 85% of the changed lines covered: coverage fails the run, and its
@@ -124,6 +148,12 @@ grep -q "not run: build failed" <<< "$out" || fail "build fails: reason missing:
 grep -q "not run: rust-tests or browser failed" <<< "$out" || fail "build fails: coverage reason: $out"
 grep -q "^cargo nextest\|^npm run" <<< "$log" && fail "build fails: tests ran: $log"
 grep -q "::error::part fmt" <<< "$out" && fail "build fails: fmt reported: $out"
+
+# A failing smoke check fails browser, and so coverage does not run.
+FAKE_SMOKE_RC=1 run true pull_request
+[ "$status" = 1 ] || fail "smoke fails: exit $status"
+grep -q "^| browser | failed: exit 1 |" <<< "$summary" || fail "smoke fails: browser row: $summary"
+grep -q "^| coverage | failed: exit 1 |" <<< "$summary" || fail "smoke fails: coverage row: $summary"
 
 # A failing CI script fails its part and the run; the others still pass.
 FAKE_CI_SCRIPT_RC=3 run true pull_request
