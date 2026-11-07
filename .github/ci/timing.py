@@ -120,10 +120,25 @@ def render(parts, parts_seconds, tests, errors):
               f"(fails over {PARTS_LIMIT} s).", "", f"{SLOWEST} slowest tests:", "",
               "| Test | Kind | Seconds | Marked slow |", "|---|---|---|---|"]
     slowest = sorted(tests, key=lambda test: -test[2])[:SLOWEST]
-    lines += [f"| {name} | {kind} | {seconds:.1f} | {'yes' if slow else 'no'} |"
+    # A "|" in a test title would end its cell.
+    lines += ["| {} | {} | {:.1f} | {} |".format(name.replace("|", "\\|"), kind, seconds, "yes" if slow else "no")
               for kind, name, seconds, slow in slowest]
     lines += ["", *(f"- **Failed:** {error}" for error in errors)]
     return "\n".join(lines) + "\n"
+
+
+def read_tests(args):
+    """(tests, errors): each report read on its own, so one missing still shows the other."""
+    pins, tests, errors = read_pins(), [], []
+    for part, read, path, pin in (("rust-tests", rust_tests, args.junit, "SLOW_RUST_FILTER"),
+                                  ("browser", browser_tests, args.playwright, "SLOW_BROWSER_TAG")):
+        try:
+            tests += read(path, pins[pin])
+        except ReportError as error:
+            rc = Path(args.parts, f"{part}.rc")
+            passed = rc.is_file() and rc.read_text().strip() == "0"
+            errors.append(f"{error}" if passed else f"{error}: the {part} part did not pass, see its log")
+    return tests, errors
 
 
 def report(args, now):
@@ -131,15 +146,13 @@ def report(args, now):
         return "### Timing\n\ndocs-only: no tests ran\n", []
     try:
         start = int(load(args.start, "parts step start", lambda p: p.read_text()).strip())
-        pins = read_pins()
-        tests = rust_tests(args.junit, pins["SLOW_RUST_FILTER"])
-        tests += browser_tests(args.playwright, pins["SLOW_BROWSER_TAG"])
         parts = read_parts(args.parts)
-    except (ReportError, ValueError, KeyError) as error:
+    except (ReportError, ValueError) as error:
         message = f"timing report not made: {error}"
         return f"### Timing\n\n- **Failed:** {message}\n", [message]
     parts_seconds = int(now) - start
-    errors = broken_rules(args.event, tests, parts_seconds)
+    tests, errors = read_tests(args)
+    errors += broken_rules(args.event, tests, parts_seconds)
     return render(parts, parts_seconds, tests, errors), errors
 
 

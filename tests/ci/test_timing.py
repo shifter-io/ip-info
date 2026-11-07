@@ -137,25 +137,51 @@ class TimingTest(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn("::error::the parts step took 241 s, over the 240 s limit.", out)
 
-    def test_missing_reports_fail(self):
-        for name, what in (("junit.xml", "Rust test report"), ("results.json", "browser test report"),
-                           ("parts/parts.start", "parts step start")):
+    def test_missing_test_report_keeps_the_parts_table(self):
+        for name, what, part in (("junit.xml", "Rust test report", "rust-tests"),
+                                 ("results.json", "browser test report", "browser")):
             with self.subTest(name):
                 self.setUp()
                 (self.dir / name).unlink()
                 status, out, summary = self.run_timing("schedule")
                 self.assertEqual(status, 1)
-                self.assertIn(f"::error::timing report not made: no {what}", out)
-                self.assertIn(str(self.dir / name), summary)
+                self.assertIn(f"::error::no {what}", out)
+                self.assertIn(f"{self.dir / name}: the {part} part did not pass, see its log", out)
+                self.assertIn("| fmt | 0 | 10 | 10 |", summary)
+                self.assertIn("Parts step: 80 s", summary)
+                self.assertIn("| ip-info::api lookup | rust | 1.0 | no |" if part == "browser"
+                              else "| pages.spec.js › home | browser | 1.0 | no |", summary)
+
+    def test_missing_report_of_a_passed_part_fails(self):
+        (self.parts / "rust-tests.rc").write_text("0\n")
+        (self.dir / "junit.xml").unlink()
+        status, out, _ = self.run_timing()
+        self.assertEqual(status, 1)
+        self.assertIn(f"::error::no Rust test report (nextest JUnit, from the rust-tests part) at "
+                      f"{self.dir / 'junit.xml'}\n", out)
+
+    def test_missing_start_fails(self):
+        (self.parts / "parts.start").unlink()
+        status, out, summary = self.run_timing()
+        self.assertEqual(status, 1)
+        self.assertIn("::error::timing report not made: no parts step start", out)
+        self.assertIn(str(self.parts / "parts.start"), summary)
 
     def test_unreadable_reports_fail(self):
-        for files in ({"junit": "<testsuites>"}, {"playwright": "{"}, {"start": "soon"}):
+        for files, error in (({"junit": "<testsuites>"}, "cannot read the Rust test report"),
+                             ({"playwright": "{"}, "cannot read the browser test report"),
+                             ({"start": "soon"}, "timing report not made: invalid literal")):
             with self.subTest(files):
                 self.setUp()
                 self.write(**files)
                 status, out, _ = self.run_timing()
                 self.assertEqual(status, 1)
-                self.assertIn("::error::timing report not made:", out)
+                self.assertIn(f"::error::{error}", out)
+
+    def test_pipe_in_a_test_title_is_escaped(self):
+        self.write(playwright=playwright(("a | b", 2, [])))
+        _, _, summary = self.run_timing()
+        self.assertIn("| pages.spec.js › a \\| b | browser | 2.0 | no |", summary)
 
     def test_docs_only_passes_without_reports(self):
         for name in ("junit.xml", "results.json", "parts/parts.start"):
