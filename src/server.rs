@@ -626,9 +626,3 @@ fn lookup<const LITE: bool>(
         }
     }
 }
-
-/// Throwaway for the coverage-gate proof (#16); reverted in the next commit.
-pub fn coverage_gate_probe(x: u32) -> u32 {
-    let doubled = x * 2;
-    doubled + 1
-}
