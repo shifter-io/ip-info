@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM rust:1.93-bookworm AS build
+FROM rust:1.94-bookworm AS build
 ARG TARGETARCH
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
