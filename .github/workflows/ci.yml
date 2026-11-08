@@ -61,7 +61,7 @@ on:
   merge_group:
     types: [checks_requested]
   schedule:
-    - cron: "0 */6 * * *"   # full run on main, slow tests included
+    - cron: "17 */6 * * *"   # full run on main, slow tests included
   workflow_dispatch:
     inputs:
       size:
